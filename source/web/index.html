@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Lunar Jetman - The Rebuild</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; }
+  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #screen { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  #result { position: fixed; left: 0; bottom: 0; color: #888; font: 12px monospace; margin: 0; }
+  #touch { position: fixed; inset: 0; pointer-events: none; display: none; }
+  .tb { position: absolute; pointer-events: auto; width: 76px; height: 76px; border-radius: 50%;
+    background: rgba(255,255,255,.10); border: 2px solid rgba(255,255,255,.35); color: rgba(255,255,255,.85);
+    font: bold 15px monospace; display: flex; align-items: center; justify-content: center; touch-action: none; }
+  .tb.on { background: rgba(90,220,255,.35); }
+  #pauseBtn { position: absolute; pointer-events: auto; top: 8px; right: 8px; width: 44px; height: 32px;
+    border-radius: 6px; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.35);
+    color: #fff; font: bold 14px monospace; display: flex; align-items: center; justify-content: center; }
+  #controllerSettings { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+    box-sizing: border-box; color: #ecf7ff; background: #080b18; border: 3px solid #5adcff;
+    box-shadow: 0 0 0 4px #18182a, 0 12px 48px #000; font: 16px/1.4 monospace; }
+  #controllerSettings::backdrop { background: rgba(0,0,0,.78); }
+  #controllerSettings h1 { color: #5adcff; font-size: 22px; margin: 0 0 8px; }
+  #controllerSettings p { margin: 6px 0 14px; }
+  #controllerSettings label { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 14px 0; }
+  #controllerSettings label span { color: #ffe046; }
+  #controllerSettings label small { grid-column: 1 / -1; color: #aeb4cc; }
+  #controllerSettings input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: #5adcff; }
+  #controllerSettings button { color: #fff; background: #242944; border: 2px solid #9696ac; padding: 9px 12px;
+    margin: 8px 6px 0 0; font: bold 15px monospace; }
+  #controllerSettings :focus-visible { outline: 3px solid #ffe046; outline-offset: 3px; }
+  #controllerDiagnostics { padding: 10px; border: 1px solid #565b76; background: #03050d; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="screen" width="1280" height="800" tabindex="0" role="img" aria-label="Lunar Jetman game screen"></canvas></div>
+<div id="touch">
+  <button type="button" class="tb" data-a="left"  style="left:16px;bottom:24px" aria-label="Move left">&#9664;</button>
+  <button type="button" class="tb" data-a="right" style="left:104px;bottom:24px" aria-label="Move right">&#9654;</button>
+  <button type="button" class="tb" data-a="down" style="left:60px;bottom:112px" aria-label="Board rover or descend">BOARD</button>
+  <button type="button" class="tb" data-a="up" style="right:16px;bottom:112px" aria-label="Jetpack thrust">JET</button>
+  <button type="button" class="tb" data-a="fire" style="right:104px;bottom:24px">FIRE</button>
+  <button type="button" class="tb" data-a="pick" style="right:16px;bottom:24px">PICK</button>
+  <button type="button" id="pauseBtn" aria-label="Pause">II</button>
+</div>
+<dialog id="controllerSettings" aria-labelledby="controllerSettingsTitle">
+  <h1 id="controllerSettingsTitle" tabindex="-1">CONTROLLER SETTINGS &amp; STATUS</h1>
+  <p id="controllerStatus" role="status" aria-live="polite">No controller detected — keyboard controls still work.</p>
+  <div id="controllerDiagnostics" aria-label="Controller diagnostics">Pads connected: 0</div>
+  <label>Horizontal dead zone <span id="deadZoneXValue">40%</span>
+    <small>Ignores left or right movement below this amount.</small>
+    <input id="deadZoneX" type="range" min="5" max="95" step="5" value="40">
+  </label>
+  <label>Thrust dead zone <span id="deadZoneUpValue">50%</span>
+    <small>Ignores upward stick movement below this amount.</small>
+    <input id="deadZoneUp" type="range" min="5" max="95" step="5" value="50">
+  </label>
+  <label>Board / descend dead zone <span id="deadZoneDownValue">60%</span>
+    <small>Keeps accidental downward input away from rover and teleporter actions.</small>
+    <input id="deadZoneDown" type="range" min="5" max="95" step="5" value="60">
+  </label>
+  <label>Release buffer <span id="hysteresisValue">0%</span>
+    <small>Stops a noisy stick flickering at the edge of its dead zone.</small>
+    <input id="hysteresis" type="range" min="0" max="25" step="5" value="0">
+  </label>
+  <div>
+    <button type="button" id="controllerApply">Apply settings</button>
+    <button type="button" id="controllerDefaults">Reset defaults</button>
+    <button type="button" id="controllerCancel">Cancel</button>
+  </div>
+  <p><small>F3 or View/Select opens this panel. D-pad or arrow keys adjust it.</small></p>
+</dialog>
+<pre id="result"></pre>
+<!--SCRIPTS-->
+<script src="assets.js"></script>
+<script src="game.js"></script>
+<script src="sfx.js"></script>
+<script src="music.js"></script>
+<script src="input.js"></script>
+<script src="main.js"></script>
+<!--/SCRIPTS-->
+</body>
+</html>

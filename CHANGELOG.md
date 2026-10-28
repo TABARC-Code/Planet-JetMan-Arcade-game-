@@ -1,0 +1,118 @@
+# Change log
+
+## v4.6.0 — 27 October 2026
+
+This release keeps the controller recovery, damage sprites, warning cues and diver
+commitment from v4.5.0, then gives the player control over pad response and gives
+the campaign a clearer visual and mechanical climb.
+
+### Added
+
+- An accessible controller setup and status dialog, opened with F3 or the standard
+  View/Select button. It reports connected pads and the active controller.
+- Separate horizontal, thrust and board/descend dead zones, plus release-buffer
+  hysteresis for sticks which hover at the threshold.
+- Browser-local controller settings with Apply, Reset defaults and Cancel actions.
+- Six named level profiles: Dust Plain, Static Valley, Crater Belt, Red Terminator,
+  Iron Waste and Black Sky.
+- Level-specific colour washes and non-colliding rock, aerial, crystal, pylon,
+  girder and obelisk landmarks.
+- A deterministic art contract covering enemy strips, explosion sheets, parallax
+  dimensions, Earth, fuel silo and the packed browser assets.
+- Selectable art-review scenes at `?stage=1` through `?stage=6`.
+
+### Changed
+
+- Enemy introductions, time limits, population, speed and spawn intervals now come
+  from explicit level profiles rather than several scattered formulae.
+- Levels beyond six continue to tighten within bounded limits instead of becoming
+  an arithmetic practical joke.
+- The HUD names the current level and colours it with that level's accent.
+- Touch controls are real buttons, the canvas is keyboard-focusable, and zoom is no
+  longer disabled in the viewport declaration.
+- Opening controller setup during play pauses safely. Closing it does not resume.
+
+### Fixed
+
+- Controller thresholds are clamped and ordered before use.
+- Reconfiguring a pad clears stale edge history and requires neutral input again.
+- D-pad menu navigation remains digital and is not swallowed by analogue dead zones.
+- Invalid gamepad axes are sanitised in both input and the live diagnostics.
+
+### Scope
+
+- The browser edition is the maintained v4.6.0 release.
+- No external art or audio was added. The new scenery is drawn by the renderer from
+  the existing palette; the parked Python/Windows prototype remains unchanged.
+
+## v4.5.0 — 24 October 2026
+
+This release follows the owner-supplied v4.4.0 record. That earlier release made
+divers commit after warning and used a temporary amber damage overlay. v4.5.0 is
+the controller-recovery, persistent damage-sprite, warning-audio and regression
+cycle requested as its successor.
+
+### Added
+
+- Active-controller ownership, disconnect detection and deliberate recovery.
+- Automatic pause when the controller actually being used disappears.
+- A neutral-input gate after connection, reconnection or lost focus. Held axes,
+  triggers and Start buttons are ignored until the pad has returned to rest.
+- Clear disconnect, reconnect and ready notices. Recovery never resumes play by
+  itself; the player presses Start or `P` when ready.
+- Runtime-generated hit-flash and damaged enemy sprites based on the existing art.
+  A heavy alien keeps a scorched appearance after surviving its first hit.
+- Generated warning sounds for controller loss, low fuel, a diver's wind-up and
+  the first rover collision in an obstruction episode.
+- A deterministic 0.55-second diver wind-up. Amber brackets and downward
+  chevrons appear before the alien commits to its captured, wrap-safe target.
+- Persistent amber rover obstruction feedback and bridge guidance.
+- F2 field telemetry for diver warnings, launches, impacts and crashes, rover
+  obstruction episodes, bridges laid and level changes. It is session-local only.
+- Asset provenance with source links and SHA-256 hashes for retained originals.
+- Regression coverage for controller recovery, enemy damage, audio priority,
+  diver timing and seam crossing, obstruction episodes, same-index controller
+  replacement and invalid axis data.
+
+### Changed
+
+- Diver attacks now begin from geometry rather than a hidden random roll. The
+  warning freezes the diver long enough to be read and captures one honest target.
+- Final-ten-seconds alarms suppress lower-priority low-fuel and local gameplay
+  cues. Diver and rover cues share a short cooldown to prevent stacked noise.
+- A different controller appearing at an existing browser index is treated as a
+  replacement and must pass through the neutral-input gate.
+- The browser release remains self-contained, while the complete-project archive
+  retains source assets, reference WAVs and the clearly labelled parked Windows build.
+- Corrected the 512-effects credit to SubspaceAudio / Juhani Junkala.
+
+### Fixed
+
+- Removed stale controller edge history after unplugging or losing focus.
+- Cleared queued keyboard and touch edges on blur or hidden-tab pause.
+- Hidden-tab pause now ducks the music as well as stopping engine and thrust loops.
+- Prevented a stale enemy reference from awarding the same kill score twice.
+- Rover blockage counters and sounds now record an encounter once, not once per
+  frame while the accelerator remains held.
+- Non-finite gamepad axis values are sanitised instead of leaking into input state.
+
+### Scope
+
+- The browser edition is the maintained v4.5.0 release.
+- The Python/Windows edition remains a parked prototype and has not been presented
+  as rebuilt or feature-equivalent.
+
+## v4.4.0 — owner-supplied release record
+
+- Made diving enemies commit to their attack after the warning countdown.
+- Fixed attacks occasionally being cancelled when the rover moved.
+- Added a temporary amber damage indicator to surviving heavy enemies.
+- Improved visual feedback without altering collision geometry.
+- Added regression coverage for diver commitment and damage feedback.
+- Updated the game and renderer version to v4.4.0.
+- Added development notes for audio, world, research and build workstreams; those
+  workstreams did not ship audio or mission-content changes in v4.4.0.
+
+The complete v4.4.0 binary archive was not present in the inspected folder. This
+historical entry records the project owner's supplied scope without claiming a
+byte-for-byte retrospective verification.

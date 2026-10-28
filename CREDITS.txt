@@ -1,0 +1,26 @@
+Third-party assets - thank you all.
+
+CC0 / public domain (no attribution required, credited anyway):
+  Aliens            "Shmup Enemies" by Buch - https://opengameart.org/content/shmup-enemies
+  Diver ship        "I ARE SPACESHIP" by bart - https://opengameart.org/content/i-are-spaceship-16x16-space-sprites
+  Earth             "Pixel Planets" by Master484 - https://opengameart.org/content/pixel-planets
+  UFO               "Space Shooter Remastered" by Kenney - https://kenney.nl/assets/space-shooter-remastered
+  Fuel silo         "16x16 Industrial Tileset" by 0x72 - https://0x72.itch.io/16x16-industrial-tileset
+  Explosions        "Explosion Animations Pack" by ansimuz - https://ansimuz.itch.io/explosion-animations-pack
+  Sound effects     "512 Sound Effects (8-bit style)" by SubspaceAudio / Juhani Junkala - https://opengameart.org/content/512-sound-effects-8-bit-style
+                    (browser edition: reworked as JavaScript synth recipes, web/sfx.js - no audio files shipped.
+                     Windows edition: the WAVs themselves.)
+
+Original to this game:
+  Music             "Moon Punk" - written as code, web/music.js. Punk in style only; no third-party music used.
+
+Free, no attribution required (author's terms):
+  Space background  "Space Background" by ansimuz - https://ansimuz.itch.io/space-background
+
+CC BY 3.0 (attribution required):
+  Touch-button icons by Lorc and Delapouite, game-icons.net - https://game-icons.net
+  (laser-blast, grab: Lorc; mars-curiosity, rocket-thruster: Delapouite)
+  Licence: https://creativecommons.org/licenses/by/3.0/
+
+Assets were cropped, scaled and recoloured for this game. Jetman, rover, alien base, depot,
+terrain, HUD, the thrust/alarm synth sounds and all code are original.
