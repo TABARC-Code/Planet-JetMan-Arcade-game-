@@ -26,6 +26,7 @@ assert(levelProfile(7).time === 75 && levelProfile(7).maxAliens === 9 && levelPr
 console.log('level profiles ok');
 
 let g = G(), p = g.p;
+const levelHeard = []; g.sfx = { play: name => levelHeard.push(name), loop() {}, stopLoops() {} };
 const bomb = g.items.find(i => i.kind === 'bomb');
 run(g, 120); p.x = bomb.x; p.y = bomb.y; p.onGround = true;
 run(g, 1, { pick_p: true }); assert(p.carry === bomb, 'pick bomb');
@@ -34,6 +35,7 @@ const lvl = g.level;
 run(g, 1, { pick_p: true }); run(g, 120); assert(!g.base.alive, 'base destroyed');
 run(g, 360); assert(g.level === lvl + 1 && g.base.alive, 'next level');
 assert(g.stats.levelTransitions === 1, 'level transition counted once');
+assert(levelHeard.filter(n => n === 'levelup').length === 1, 'level transition has one stinger');
 console.log('bomb ok');
 
 g = G(); p = g.p; let c = g.terr.craters[0];
@@ -63,7 +65,9 @@ g = G(); p = g.p; r = g.rover; p.fuel = 10; p.x = r.x; p.y = g.terr.base(r.x); p
 run(g, 1, { down_p: true }); assert(p.inRover, 'board'); run(g, 120); assert(p.fuel > 60, 'refuel');
 run(g, 1, { up_p: true }); assert(!p.inRover, 'leave'); console.log('rover enter/exit ok');
 
-g = G(); g.timer = 0.01; const lives = g.lives; run(g, 2); assert(g.missiles.length === 2, 'launch');
+g = G(); const missileHeard = []; g.sfx = { play: name => missileHeard.push(name), loop() {}, stopLoops() {} };
+g.timer = 0.01; const lives = g.lives; run(g, 2); assert(g.missiles.length === 2, 'launch');
+assert(missileHeard.includes('missilewarn') && missileHeard.includes('launch'), 'missile warning and launch cues both play');
 run(g, 3600); assert(g.lives === lives - 1 && g.earthHits === 1, 'missiles land'); console.log('missiles ok');
 
 g = G(); g.earthHits = 2; g.timer = 0.01; run(g, 600); assert(g.over, 'earth destroyed'); console.log('earth over ok');
@@ -97,9 +101,11 @@ const seamAim = wrap(r.x + L.DIVER_AIM_LEAD);
 const seamDiver = new Alien('diver', seamAim, 70, 1, 0); g.aliens.push(seamDiver);
 run(g, 1); assert(seamDiver.diveWarnT > 0 && seamDiver.diveTargetX === seamAim, 'diver lock works across world seam');
 
-g = G(); const h = new Alien('heavy', wrap(g.p.x + 30), 60, 1, 0); g.aliens.push(h); g.p.face = 1;
+g = G(); const damageHeard = []; g.sfx = { play: name => damageHeard.push(name), loop() {}, stopLoops() {} };
+const h = new Alien('heavy', wrap(g.p.x + 30), 60, 1, 0); g.aliens.push(h); g.p.face = 1;
 assert(h.hp === 2 && h.hpMax === 2 && h.hitT === 0, 'heavy damage state initialised');
 g.killAlien(h); assert(g.aliens.includes(h) && h.hp === 1 && h.hitT > 0, 'heavy survives with hit flash');
+assert(damageHeard[damageHeard.length - 1] === 'heavyhit', 'surviving heavy uses armoured hit cue');
 g.updateAliens(L.ALIEN_HIT_FLASH / 2); assert(h.hitT > 0 && h.hp < h.hpMax, 'hit flash remains briefly');
 g.updateAliens(L.ALIEN_HIT_FLASH); assert(h.hitT === 0 && h.hp < h.hpMax, 'persistent damaged state outlives flash');
 const heavyScore = g.score; g.killAlien(h); assert(!g.aliens.includes(h) && g.score === heavyScore + L.ALIEN_SCORE.heavy, 'heavy dies and scores once');

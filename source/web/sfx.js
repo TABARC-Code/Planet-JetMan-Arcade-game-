@@ -147,7 +147,87 @@ const SFX_RECIPES = {
     { wave: 'tri', f: [[0, 190], [0.1, 130], [0.21, 190], [0.31, 130]],
       amp: [[0, 0.35], [0.1, 0], [0.2, 0], [0.21, 0.35], [0.31, 0], [0.42, 0]] },
   ] },
+
+  // A surviving heavy should sound armoured rather than merely inconvenienced.
+  heavyhit: { dur: 0.28, gain: 0.58, voices: [
+    { wave: 'square', f: [[0, 180], [0.05, 92], [0.28, 58]], lp: [[0, 1200], [0.28, 420]],
+      amp: [[0, 1], [0.04, 0.5], [0.10, 0.7], [0.28, 0]] },
+    { wave: 'noise', f: [[0, 7000]], lp: [[0, 3800], [0.12, 900]],
+      amp: [[0, 0.9], [0.025, 0.35], [0.12, 0.12], [0.28, 0]] },
+  ] },
+
+  // Short mission-step fanfare. Enough ceremony to mark a new level, not enough
+  // to make the player wait for a brass section to clear the landing site.
+  levelup: { dur: 0.68, gain: 0.50, echo: { delay: 0.12, decay: 0.24, count: 2 }, voices: [
+    { wave: 'square', steps: [[0, 330], [0.11, 440], [0.22, 523], [0.34, 659], [0.48, 784]], lp: [[0, 3400]],
+      amp: [[0, 0.75], [0.08, 0.65], [0.10, 0], [0.11, 0.75], [0.19, 0.6], [0.21, 0],
+        [0.22, 0.78], [0.31, 0.62], [0.33, 0], [0.34, 0.82], [0.46, 0.65], [0.48, 0.86], [0.64, 0.55], [0.68, 0]] },
+    { wave: 'tri', f: [[0.34, 165], [0.68, 196]], amp: [[0, 0], [0.34, 0.3], [0.64, 0.2], [0.68, 0]] },
+  ] },
+
+  // Missile launch warning: a hard alternating pulse below the countdown alarm.
+  missilewarn: { dur: 0.50, gain: 0.52, voices: [
+    { wave: 'pulse', duty: 0.25, steps: [[0, 310], [0.10, 465], [0.24, 310], [0.34, 465]], lp: [[0, 2200]],
+      amp: [[0, 0.9], [0.08, 0.7], [0.10, 0], [0.23, 0], [0.24, 0.9], [0.32, 0.7], [0.34, 0], [0.50, 0]] },
+  ] },
 };
+
+// Quiet suit-radio beds. They are deliberately synthetic: there is no wind on the
+// Moon, however much a sound library may insist otherwise. Four-second periods keep
+// the oscillators on whole cycles and make the loop seams behave themselves.
+const AMBIENT_RECIPES = {
+  dust: { dur: 4, gain: 0.10, loop: true, voices: [
+    { wave: 'sine', f: [[0, 55], [4, 55]], amp: [[0, 0.35], [4, 0.35]] },
+    { wave: 'noise', f: [[0, 520], [4, 520]], lp: [[0, 260]], am: [0.5, 0.55], amp: [[0, 0.22], [4, 0.22]] },
+  ] },
+  static: { dur: 4, gain: 0.105, loop: true, voices: [
+    { wave: 'noise', f: [[0, 2100], [2, 3600], [4, 2100]], lp: [[0, 1500], [2, 2300], [4, 1500]], am: [3, 0.7], amp: [[0, 0.35], [4, 0.35]] },
+    { wave: 'sine', f: [[0, 72], [4, 72]], amp: [[0, 0.18], [4, 0.18]] },
+  ] },
+  crater: { dur: 4, gain: 0.10, loop: true, voices: [
+    { wave: 'sine', f: [[0, 47], [4, 47]], am: [0.25, 0.4], amp: [[0, 0.42], [4, 0.42]] },
+    { wave: 'tri', f: [[0, 94], [4, 94]], amp: [[0, 0.12], [4, 0.12]] },
+  ] },
+  red: { dur: 4, gain: 0.11, loop: true, voices: [
+    { wave: 'tri', f: [[0, 64], [4, 64]], am: [1, 0.65], amp: [[0, 0.4], [4, 0.4]] },
+    { wave: 'sine', f: [[0, 96], [4, 96]], am: [0.5, 0.35], amp: [[0, 0.16], [4, 0.16]] },
+  ] },
+  iron: { dur: 4, gain: 0.10, loop: true, voices: [
+    { wave: 'pulse', duty: 0.18, steps: [[0, 32], [1, 48], [2, 32], [3, 48]], lp: [[0, 460]], am: [2, 0.72], amp: [[0, 0.32], [4, 0.32]] },
+    { wave: 'noise', f: [[0, 1500], [4, 1500]], lp: [[0, 620]], am: [1, 0.75], amp: [[0, 0.2], [4, 0.2]] },
+  ] },
+  void: { dur: 4, gain: 0.115, loop: true, voices: [
+    { wave: 'sine', f: [[0, 43.5], [4, 43.5]], am: [0.25, 0.28], amp: [[0, 0.45], [4, 0.45]] },
+    { wave: 'tri', f: [[0, 65.25], [4, 65.25]], am: [0.5, 0.3], amp: [[0, 0.14], [4, 0.14]] },
+  ] },
+};
+const AMBIENCE_BY_THEME = Object.freeze({ dust: 'dust', static: 'static', crater: 'crater', red: 'red', iron: 'iron', void: 'void' });
+
+// Larger priority numbers win. The browser mixer uses this table for concurrent-
+// voice limits and brief music/ambience ducking; the recipes remain pure sound data.
+const AUDIO_EVENT_META = Object.freeze({
+  alarm:       Object.freeze({ priority: 5, max: 1, cooldown: 0.08, duck: 0.30 }),
+  warning:     Object.freeze({ priority: 5, max: 1, cooldown: 0.20, duck: 0.50 }),
+  missilewarn: Object.freeze({ priority: 5, max: 1, cooldown: 0.40, duck: 0.55 }),
+  die:         Object.freeze({ priority: 5, max: 1, cooldown: 0.20, duck: 0.55 }),
+  levelup:     Object.freeze({ priority: 4, max: 1, cooldown: 0.50, duck: 0.45 }),
+  bigboom:     Object.freeze({ priority: 4, max: 2, cooldown: 0.06, duck: 0.45 }),
+  heavyhit:    Object.freeze({ priority: 3, max: 2, cooldown: 0.06, duck: 0.18 }),
+  cannon:      Object.freeze({ priority: 3, max: 2, cooldown: 0.04, duck: 0.15 }),
+  boom:        Object.freeze({ priority: 2, max: 4, cooldown: 0.02, duck: 0 }),
+  laser:       Object.freeze({ priority: 2, max: 4, cooldown: 0.018, duck: 0 }),
+});
+const DEFAULT_AUDIO_META = Object.freeze({ priority: 2, max: 3, cooldown: 0.02, duck: 0 });
+function audioMeta(name) { return AUDIO_EVENT_META[name] || DEFAULT_AUDIO_META; }
+function chooseVoiceSlot(active, incomingPriority, maxVoices = 16) {
+  if (active.length < maxVoices) return { allow: true, steal: -1 };
+  let index = 0;
+  for (let i = 1; i < active.length; i++) {
+    if (active[i].priority < active[index].priority ||
+        (active[i].priority === active[index].priority && active[i].started < active[index].started)) index = i;
+  }
+  return active[index].priority < incomingPriority ? { allow: true, steal: index } : { allow: false, steal: -1 };
+}
 
 // ---- the renderer. Pure maths, no Web Audio, so node can run it for the comparison tests.
 function sfxCurve(points, t, log) {
@@ -215,4 +295,7 @@ function renderSfx(recipe, sr, seed = 1) {
   return out;
 }
 
-if (typeof module !== 'undefined') module.exports = { SFX_RECIPES, renderSfx };
+if (typeof module !== 'undefined') module.exports = {
+  SFX_RECIPES, AMBIENT_RECIPES, AMBIENCE_BY_THEME, AUDIO_EVENT_META,
+  DEFAULT_AUDIO_META, audioMeta, chooseVoiceSlot, renderSfx,
+};

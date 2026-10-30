@@ -38,5 +38,21 @@ const packed = fs.readFileSync(path.join(root, 'web', 'assets.js'), 'utf8');
 for (const name of [...Object.keys(aliens), ...Object.keys(explosions), 'bg_back.png', 'bg_stars.png', 'earth.png', 'silo.png']) {
   assert(packed.includes(name.replace('.png', '')), `${name} is present in the packed browser assets`);
 }
-console.log('art asset contract ok');
+
+const main = fs.readFileSync(path.join(root, 'web', 'main.js'), 'utf8');
+const jetTopMatch = main.match(/const JET_TOP = \[([\s\S]*?)\n\];/);
+const jetLegMatch = main.match(/const JET_LEGS = \{([\s\S]*?)\n\};/);
+assert(jetTopMatch && jetLegMatch, 'Jetman source sprites remain explicit and testable');
+const rows = text => [...text.matchAll(/'([^']+)'/g)].map(m => m[1]);
+const jetTop = rows(jetTopMatch[1]), jetLegs = rows(jetLegMatch[1]);
+assert(jetTop.length === 15 && jetLegs.length === 20, 'Jetman keeps 15 shared body rows and four five-row poses');
+for (const row of [...jetTop, ...jetLegs]) {
+  assert(row.length === 17, 'every Jetman row keeps the 17-pixel animation grid');
+  assert(/^[.WwCBbYORrKcgGmM]+$/.test(row), 'Jetman uses only the declared game palette');
+}
+assert(main.includes('for (const o of [-13, 0, 13])'), 'rover keeps three articulated wheel positions');
+assert(main.includes('R(c, PALC.K, sx - 21, by - 14, 42, 8)'), 'rover keeps the 42-pixel outlined chassis');
+assert(main.includes('wheel(tsx - 7') && main.includes('wheel(tsx + 7'), 'equipment trailer keeps its two-wheel silhouette');
+
+console.log('art asset and original sprite contract ok');
 console.log('ALL OK');

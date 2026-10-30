@@ -1,7 +1,8 @@
-# Asset provenance — browser 4.6.0
+# Asset provenance — browser 4.7.0
 
 I checked the retained provenance record and local originals for this release on
-27 October 2026. The public source pages were last checked on 24 October 2026, and
+28 October 2026. The retained public source pages were last checked on 24 October
+2026, and
 the locally retained originals were matched by SHA-256. The slim browser release does not bundle
 them; the complete-project archive does, together with the available licence
 evidence. The hashes let a later rebuild identify them without relying on a
@@ -31,5 +32,9 @@ The asset-processing script crops, scales, recolours and packs these sources.
 The browser runtime uses the resulting `web/assets.js`; it does not fetch any
 third-party material or play the reference WAV files.
 
-Release 4.6.0 adds no external artwork. Its level landmarks and colour washes are
-drawn at runtime from simple geometry and the project's existing palette.
+Release 4.7.0 adds no external runtime artwork or audio. Its Jetman animation,
+rover, trailer, level ambience and new event sounds are drawn or synthesised by the
+project at runtime. The CC0 Astro and Roaming World Sprites pages were reviewed for
+scale and animation rhythm; no frames from either sheet are copied or shipped.
+The full archive retains an original v4.7.0 concept sheet as design evidence. It is
+not loaded by the game.

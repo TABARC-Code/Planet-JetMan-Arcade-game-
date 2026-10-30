@@ -1,4 +1,26 @@
-# Programmer notes — browser 4.6.0
+# Programmer notes — browser 4.7.0
+
+For 4.7.0 I replaced the two silhouettes that still looked like placeholders.
+Jetman now has one shared 17-pixel body across idle, two walking strides and flight,
+so his visor, pack and chest panel stay attached to the same person. The rover now
+has a properly outlined chassis, three articulated wheel positions, a readable cab
+and a trailer which appears engineered rather than mildly embarrassed.
+
+I reviewed two CC0 platformer sheets for scale and pose rhythm, then kept their
+pixels out of the build. The result is original project art, fixed to the existing
+palette and tested at row level. Collision geometry has not changed.
+
+The audio system grew up at the same time. Effects and ambience now use separate
+buses, a 16-voice priority limit and short warning ducking. Six level beds provide
+radio hiss, relay chatter and low machinery without inventing lunar weather. Heavy
+damage, missile launch and level transition each gained their own cue. Everything
+is still generated in JavaScript.
+
+Future ideas: a boarding animation, cannon recoil and a rover damage state. I have
+left them out until the new scale has survived ordinary play; enthusiasm remains a
+poor substitute for collision testing.
+
+## v4.6.0 notes
 
 For 4.6.0 I turned the difficulty curve into six named profiles. The same moon now
 develops a recognisable geography: Dust Plain rocks, Static Valley aerials, Crater

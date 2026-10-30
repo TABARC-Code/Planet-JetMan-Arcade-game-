@@ -11,15 +11,20 @@
 
 // ------------------------------------------------------------------ sprites (original art)
 // Jetman, rover kit and items are drawn as strings. Daft, but you can diff them.
+// The larger suit keeps a fixed palette and silhouette across every pose: white
+// pressure shell, cyan visor, cobalt pack, amber chest panel and dark edging.
 const JET_TOP = [
-  '...WWWW....', '..WWWWWW...', '..WWWCCCC..', '..WWWCCCc..', '...WWWWW...',
-  '.BBWWWWW...', '.BBWWWWWwww', '.BBWWWWW...', '.bBWWWWW...', '..bWWWWW...',
+  '......wwwww......', '....wwWWWWWww....', '...wWWWWWWWWWw...',
+  '...wWWCCCCWWWw...', '...wWWCCCcWWWw...', '...wWWWWWWWWWw...',
+  '....wwwwwww......', '..BBbwWWWWWw.....', '.bBBBwWYYYWWw....',
+  '.bBBBwWWCWWWw....', '.bBBBwWWWWWWw....', '..BBbwWWWWWw.Y...',
+  '....wWWWWWWwWY...', '....wWWWWWWw.....', '.....wWWWWw......',
 ];
 const JET_LEGS = {
-  stand: ['...WW.WW...', '...WW.WW...', '..www.www..'],
-  walk1: ['..WW...WW..', '.WW.....WW.', '.ww.....ww.'],
-  walk2: ['...WW.WW...', '....WWW....', '....www....'],
-  fly: ['...WW.WW...', '....W.W....', '....w.w....'],
+  stand: ['.....WW..WW......', '....wWW..WWw.....', '....WWW..WWW.....', '...wWWW..WWWw....', '...wwww..wwww....'],
+  walk1: ['.....WW..WW......', '....WWW...WW.....', '...WWW.....WW....', '..wWWW.....WWW...', '..wwww.....wwww..'],
+  walk2: ['.....WW..WW......', '.....WW.WWW......', '......WW..WWW....', '......WW...WWW...', '.....www...wwww..'],
+  fly: ['.....WW..WW......', '....wWW..WWw.....', '.....WW..WW......', '.....OO..OO......', '.....Y....Y......'],
 };
 const ITEM_ART = {
   bomb: ['......YO.', '.....K...', '...RRRR..', '..RRWRRR.', '.RRWRRRRr',
@@ -309,7 +314,7 @@ function drawWorld(c, g, now) {
     const sx = gsx(g, p.x);
     const legs = p.onGround ? (Math.abs(p.vx) < 1 ? 'stand' : (trunc(p.walk) % 2 === 0 ? 'walk1' : 'walk2')) : 'fly';
     const spr = art.jet[legs + '_' + p.face];
-    c.drawImage(spr, sx - 5, trunc(p.y) - spr.height);
+    c.drawImage(spr, sx - (spr.width >> 1), trunc(p.y) - spr.height);
   }
   if (p.carry) drawItem(c, g, p.carry, p.face);
   for (const a of g.aliens) {
@@ -446,38 +451,63 @@ function drawRover(c, g, now) {
   if (sx <= -70 || sx >= W + 70) return;
   const d = r.dir, by = g.roverY();
   const tx = r.trailerX(), tsx = gsx(g, tx), ty = g.terr.base(tx);
-  line(c, PALC.w, sx - d * 14, by - 6, tsx + d * 8, ty - 6);
-  R(c, PALC.w, tsx - 9, ty - 7, 18, 2);
-  R(c, 'rgb(90,90,110)', tsx - 8, ty - 5, 16, 1);
-  circ(c, PALC.K, tsx, ty - 3, 3);
-  circ(c, 'rgb(110,110,130)', tsx, ty - 3, 2);
+  const wheel = (cx, cy, spin, radius = 5) => {
+    circ(c, PALC.K, cx, cy, radius);
+    circ(c, 'rgb(78,82,102)', cx, cy, radius - 1);
+    circ(c, PALC.K, cx, cy, Math.max(1, radius - 3));
+    const hx = Math.round((radius - 2) * Math.cos(spin));
+    const hy = Math.round((radius - 2) * Math.sin(spin));
+    P(c, PALC.W, cx + hx, cy + hy); P(c, PALC.W, cx - hx, cy - hy);
+    P(c, PALC.b, cx + hy, cy - hx); P(c, PALC.b, cx - hy, cy + hx);
+  };
+
+  // A low equipment sled with two wheels reads as part of the rover rather than
+  // a loose rectangle which happens to follow it across the moon.
+  line(c, PALC.w, sx - d * 20, by - 7, tsx + d * 11, ty - 7);
+  R(c, PALC.K, tsx - 12, ty - 9, 24, 2);
+  R(c, PALC.W, tsx - 11, ty - 8, 22, 2);
+  R(c, PALC.B, tsx - 10, ty - 6, 20, 2);
+  wheel(tsx - 7, ty - 3, r.wheel, 3);
+  wheel(tsx + 7, ty - 3, r.wheel, 3);
   if (r.cargo) {
     const spr = art.item[r.cargo.kind + '_' + (r.cargo.kind === 'cannon' ? d : 1)];
-    c.drawImage(spr, tsx - (spr.width >> 1), ty - 7 - spr.height);
+    c.drawImage(spr, tsx - (spr.width >> 1), ty - 9 - spr.height);
   }
-  for (const o of [-10, 0, 10]) {
-    const wy = g.terr.base(r.x + o) - 3, cx = sx + o;
-    circ(c, PALC.K, cx, wy, 4);
-    circ(c, 'rgb(110,110,130)', cx, wy, 3);
-    const a = r.wheel + o;
-    P(c, 'rgb(235,235,245)', cx + Math.round(2 * Math.cos(a)), wy + Math.round(2 * Math.sin(a)));
-    line(c, PALC.w, cx, wy, cx, by - 7);
+
+  for (const o of [-13, 0, 13]) {
+    const wy = g.terr.base(r.x + o) - 4, cx = sx + o;
+    line(c, PALC.w, cx, wy, cx - d * 3, by - 9);
+    wheel(cx, wy, r.wheel + o * 0.15);
   }
-  R(c, PALC.W, sx - 14, by - 12, 28, 5);
-  R(c, PALC.B, sx - 14, by - 10, 28, 2);
-  R(c, PALC.w, sx - 15, by - 7, 30, 2);
-  for (let i = 0; i < r.bridges; i++) R(c, PALC.O, sx - d * 4 - 4, by - 13 - i * 2, 8, 1);
-  const cx = sx + d * 6;
-  circ(c, PALC.c, cx, by - 12, 5, 0, true);
-  P(c, PALC.W, cx - d * 2, by - 15);
-  if (g.p.inRover && !g.p.dead) { R(c, PALC.W, cx - 1, by - 15, 3, 3); P(c, PALC.C, cx + d, by - 14); }
-  const ax = sx - d * 11;
-  line(c, PALC.w, ax, by - 12, ax, by - 19);
-  P(c, trunc(now * 2) % 2 ? PALC.R : 'rgb(80,0,0)', ax, by - 20);
+
+  // Layered chassis, cab and service panels. At this resolution silhouette earns
+  // its keep before decorative pixels do, hence the dark continuous outline.
+  R(c, PALC.K, sx - 21, by - 14, 42, 8);
+  R(c, PALC.W, sx - 20, by - 13, 40, 5);
+  R(c, PALC.B, sx - 20, by - 10, 40, 4);
+  R(c, PALC.b, sx - 18, by - 7, 36, 2);
+  for (const px of [-15, -10, -5]) P(c, trunc(now * 4 + px) % 3 ? PALC.C : PALC.Y, sx + d * px, by - 11);
+  for (let i = 0; i < r.bridges; i++) R(c, PALC.O, sx - d * 7 - 5, by - 15 - i * 2, 10, 1);
+
+  const cx = sx + d * 7;
+  circ(c, PALC.K, cx, by - 14, 7, 0, true);
+  circ(c, PALC.c, cx, by - 14, 6, 0, true);
+  line(c, PALC.C, cx - 5, by - 16, cx + 5, by - 16);
+  P(c, PALC.W, cx - d * 3, by - 18);
+  if (g.p.inRover && !g.p.dead) {
+    R(c, PALC.W, cx - 2, by - 19, 4, 4);
+    R(c, PALC.C, cx + d, by - 18, 2, 2);
+  }
+
+  const ax = sx - d * 14;
+  line(c, PALC.w, ax, by - 14, ax - d * 2, by - 23);
+  P(c, trunc(now * 2) % 2 ? PALC.R : 'rgb(80,0,0)', ax - d * 2, by - 24);
+  const nose = sx + d * 21;
+  line(c, PALC.w, nose, by - 12, nose + d * 3, by - 9);
   const noseCol = r.blocked && trunc(now * 8) % 2 ? PALC.R : PALC.Y;
-  P(c, noseCol, sx + d * 14, by - 11);
+  R(c, noseCol, d > 0 ? nose : nose - 1, by - 12, 2, 2);
   if (r.blocked) {
-    const hx = sx + d * 20, hy = by - 18, spread = r.blockedPulse > 0 ? 5 : 3;
+    const hx = sx + d * 26, hy = by - 20, spread = r.blockedPulse > 0 ? 5 : 3;
     line(c, PALC.O, hx - spread, hy - 3, hx, hy + 2);
     line(c, PALC.O, hx, hy + 2, hx + spread, hy - 3);
     P(c, PALC.W, hx, hy - 5);
@@ -503,7 +533,7 @@ function drawHud(f, g, now, hiscore) {
   const look = levelLook(g);
   text(f, 30, `LEVEL ${g.level} ${g.levelName ? g.levelName() : ''}`, 590, 4, look.accent);
   f.imageSmoothingEnabled = false;
-  for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 780 + i * 28, 6, 22, 26);
+  for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 780 + i * 28, 4, 22, 27);
   text(f, 30, 'EARTH', 1040, 4, PALC.B);
   for (let i = 0; i < 3; i++) R(f, i < g.earthHits ? PALC.R : PALC.G, 1150 + i * 38, 10, 30, 18);
   text(f, 22, 'FUEL', 16, 40, PALC.W);
@@ -561,7 +591,7 @@ const TITLE_LINES = [
   ['X / SHIFT / ENTER', 'PICK UP / DROP  -  IN ROVER: LAY BRIDGE'],
   ['DOWN / S', 'BOARD ROVER  -  USE TELEPORTER PAD'],
   ['UP (IN ROVER)', 'LEAVE THE ROVER'],
-  ['P  M  N  F  F2  F3  ESC', 'PAUSE  MUTE  MUSIC  FULLSCREEN  DATA  PAD SETUP  TITLE'],
+  ['P  M  N  B  F  F2  F3  ESC', 'PAUSE  MUTE  MUSIC  AMBIENCE  FULLSCREEN  DATA  PAD SETUP  TITLE'],
 ];
 const HOWTO = [
   'Carry the BOMB to the alien base and drop it from ABOVE.',
@@ -592,8 +622,10 @@ function drawTitle(f, now, hiscore) {
 let MUSIC_DATA = null;
 class WebSfx {
   constructor() {
-    this.ctx = null; this.muted = false; this.musicOn = true; this.buf = {}; this.vol = {}; this.loops = {};
-    this.music = null; this.musicGain = null;
+    this.ctx = null; this.muted = false; this.musicOn = true; this.ambientOn = true; this.paused = false;
+    this.buf = {}; this.vol = {}; this.loops = {}; this.active = []; this.lastPlayed = {};
+    this.music = null; this.musicGain = null; this.ambient = null; this.ambientTheme = null;
+    this.maxVoices = 16;
   }
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
@@ -601,6 +633,8 @@ class WebSfx {
     if (!AC) return;
     try { this.ctx = new AC(); } catch (e) { this.ctx = null; return; }
     this.master = this.ctx.createGain(); this.master.gain.value = 0.8; this.master.connect(this.ctx.destination);
+    this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = 1; this.sfxBus.connect(this.master);
+    this.ambientBus = this.ctx.createGain(); this.ambientBus.gain.value = this.ambientLevel(); this.ambientBus.connect(this.master);
     const sr = this.ctx.sampleRate;
     for (const name in SFX_RECIPES) {
       const data = renderSfx(SFX_RECIPES[name], sr);
@@ -608,8 +642,15 @@ class WebSfx {
       buf.getChannelData(0).set(data);
       this.buf[name] = buf;
     }
+    for (const name in AMBIENT_RECIPES) {
+      const data = renderSfx(AMBIENT_RECIPES[name], sr);
+      const buf = this.ctx.createBuffer(1, data.length, sr);
+      buf.getChannelData(0).set(data);
+      this.buf['ambient:' + name] = buf;
+    }
     this.vol.engine = 0.7; this.vol.thrust = 0.8;
     this.startMusic();
+    if (this.ambientTheme) this.setAmbience(this.ambientTheme, this.paused);
   }
   startMusic() {
     if (!this.ctx || this.music || !MUSIC_DATA) return;
@@ -624,17 +665,63 @@ class WebSfx {
     this.music = src;
   }
   // Music sits under the effects. 0.3 felt right; 0.5 drowned the laser.
-  musicLevel(paused) { return (this.muted || !this.musicOn) ? 0 : paused ? 0.1 : 0.3; }
-  setMusic(paused) {
-    if (this.musicGain) this.musicGain.gain.setTargetAtTime(this.musicLevel(paused), this.ctx.currentTime, 0.08);
+  musicLevel(paused = this.paused) { return (this.muted || !this.musicOn) ? 0 : paused ? 0.1 : 0.3; }
+  ambientLevel(paused = this.paused) { return (this.muted || !this.ambientOn) ? 0 : paused ? 0.10 : 0.28; }
+  setMusic(paused = this.paused) {
+    this.paused = !!paused;
+    if (this.musicGain) this.musicGain.gain.setTargetAtTime(this.musicLevel(), this.ctx.currentTime, 0.08);
   }
-  source(name) {
+  setPaused(paused) {
+    this.paused = !!paused;
+    this.setMusic(this.paused);
+    if (this.ambientBus) this.ambientBus.gain.setTargetAtTime(this.ambientLevel(), this.ctx.currentTime, 0.08);
+  }
+  setMuted(on) {
+    this.muted = !!on;
+    if (this.muted) this.stopLoops();
+    if (!this.ctx) return;
+    this.setPaused(this.paused);
+    this.setAmbience(this.ambientTheme, this.paused);
+  }
+  setAmbientOn(on) {
+    this.ambientOn = !!on;
+    if (!this.ctx) return;
+    this.setAmbience(this.ambientTheme, this.paused);
+    this.ambientBus.gain.setTargetAtTime(this.ambientLevel(), this.ctx.currentTime, 0.08);
+  }
+  source(name, bus = 'sfx', level = 1) {
     const s = this.ctx.createBufferSource(); s.buffer = this.buf[name];
-    const gn = this.ctx.createGain(); gn.gain.value = this.vol[name] || 1;
-    s.connect(gn).connect(this.master);
+    const gn = this.ctx.createGain(); gn.gain.value = (this.vol[name] || 1) * level;
+    s.connect(gn).connect(bus === 'ambient' ? this.ambientBus : this.sfxBus);
+    s.voiceGain = gn;
     return s;
   }
-  play(name) { if (!this.ctx || this.muted || !this.buf[name]) return; this.source(name).start(); }
+  duckFor(seconds, amount) {
+    if (!this.ctx || !amount) return;
+    const now = this.ctx.currentTime;
+    for (const [node, normal] of [[this.musicGain, this.musicLevel()], [this.ambientBus, this.ambientLevel()]]) {
+      if (!node) continue;
+      const p = node.gain; p.cancelScheduledValues(now); p.setValueAtTime(p.value, now);
+      p.setTargetAtTime(normal * (1 - amount), now, 0.025);
+      p.setTargetAtTime(normal, now + seconds, 0.12);
+    }
+  }
+  play(name) {
+    if (!this.ctx || this.muted || !this.buf[name]) return false;
+    const now = this.ctx.currentTime, meta = audioMeta(name);
+    if (now - (this.lastPlayed[name] ?? -Infinity) < meta.cooldown) return false;
+    this.active = this.active.filter(v => !v.done);
+    if (this.active.filter(v => v.name === name).length >= meta.max) return false;
+    const slot = chooseVoiceSlot(this.active, meta.priority, this.maxVoices);
+    if (!slot.allow) return false;
+    if (slot.steal >= 0) { const old = this.active[slot.steal]; old.done = true; try { old.source.stop(); } catch (e) { /* ended */ } }
+    this.active = this.active.filter(v => !v.done);
+    const source = this.source(name), voice = { name, source, priority: meta.priority, started: now, done: false };
+    source.onended = () => { voice.done = true; };
+    this.active.push(voice); this.lastPlayed[name] = now; source.start();
+    this.duckFor(Math.min(0.7, SFX_RECIPES[name].dur), meta.duck);
+    return true;
+  }
   loop(name, on) {
     if (!this.ctx) return;
     const cur = this.loops[name];
@@ -643,6 +730,26 @@ class WebSfx {
     } else if (cur) { try { cur.stop(); } catch (e) { /* already stopped */ } delete this.loops[name]; }
   }
   stopLoops() { for (const n of Object.keys(this.loops)) this.loop(n, false); }
+  setAmbience(theme, paused = this.paused) {
+    const pauseChanged = this.paused !== !!paused;
+    this.ambientTheme = theme || null; this.paused = !!paused;
+    if (!this.ctx) return;
+    if (pauseChanged) this.ambientBus.gain.setTargetAtTime(this.ambientLevel(), this.ctx.currentTime, 0.08);
+    const fadeOut = current => {
+      if (!current) return;
+      current.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.06);
+      try { current.source.stop(this.ctx.currentTime + 0.3); } catch (e) { /* already ended */ }
+    };
+    if (this.muted || !this.ambientOn || !theme || !AMBIENCE_BY_THEME[theme]) {
+      fadeOut(this.ambient); this.ambient = null; return;
+    }
+    if (this.ambient && this.ambient.theme === theme) return;
+    fadeOut(this.ambient);
+    const key = 'ambient:' + AMBIENCE_BY_THEME[theme], source = this.source(key, 'ambient');
+    source.loop = true;
+    const gain = source.voiceGain; gain.gain.value = 0; gain.gain.setTargetAtTime(1, this.ctx.currentTime, 0.08);
+    source.start(); this.ambient = { theme, source, gain };
+  }
 }
 
 // ------------------------------------------------------------------ input
@@ -683,7 +790,7 @@ function pollInput(inp) {
       if (S.state === 'play') {
         S.state = 'pause';
         sfx.stopLoops();
-        sfx.setMusic(true);
+        sfx.setPaused(true);
         sfx.play('warning');
       }
       showSystemNotice('CONTROLLER DISCONNECTED', 'Reconnect it or use the keyboard. Press P to resume.', 'warning', Infinity);
@@ -771,7 +878,7 @@ function readControllerForm() {
 function openControllerSettings() {
   const dialog = controllerDialog();
   if (!dialog || dialog.open) return;
-  if (S.state === 'play') { S.state = 'pause'; sfx.stopLoops(); sfx.setMusic(true); }
+  if (S.state === 'play') { S.state = 'pause'; sfx.stopLoops(); sfx.setPaused(true); }
   held.clear(); touchHeld.clear(); edges = new Set();
   syncControllerForm(controllers.getSettings());
   if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', '');
@@ -853,11 +960,12 @@ window.addEventListener('keydown', e => {
   if (!e.repeat) {
     if (a) edges.add(a);
     if (e.code === 'KeyP') edges.add('pause');
-    if (e.code === 'KeyM') { sfx.muted = !sfx.muted; sfx.stopLoops(); sfx.setMusic(S.state === 'pause'); }
+    if (e.code === 'KeyM') sfx.setMuted(!sfx.muted);
     if (e.code === 'KeyN') { sfx.musicOn = !sfx.musicOn; sfx.setMusic(S.state === 'pause'); }
+    if (e.code === 'KeyB') sfx.setAmbientOn(!sfx.ambientOn);
     if (e.code === 'KeyF') toggleFullscreen();
     if (e.code === 'F2') { e.preventDefault(); S.showTelemetry = !S.showTelemetry; }
-    if (e.code === 'Escape' && S.state !== 'title') { sfx.stopLoops(); S.state = 'title'; }
+    if (e.code === 'Escape' && S.state !== 'title') { sfx.stopLoops(); sfx.setAmbience(null); S.state = 'title'; }
   }
   held.add(e.code);
 });
@@ -867,7 +975,7 @@ window.addEventListener('blur', () => { held.clear(); touchHeld.clear(); edges =
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     held.clear(); touchHeld.clear(); edges = new Set(); controllers.reset();
-    if (S.state === 'play') { S.state = 'pause'; sfx.stopLoops(); sfx.setMusic(true); }
+    if (S.state === 'play') { S.state = 'pause'; sfx.stopLoops(); sfx.setPaused(true); }
   }
 });
 
@@ -901,23 +1009,28 @@ function step(dt) {
   if (edges.has('pause') && (S.state === 'play' || S.state === 'pause')) {
     S.state = S.state === 'play' ? 'pause' : 'play';
     sfx.stopLoops();
-    sfx.setMusic(S.state === 'pause');
+    sfx.setPaused(S.state === 'pause');
     if (S.state === 'play') S.notice = null;
   }
   if (S.state === 'title') {
     S.demo.cam = wrap(S.demo.cam + 30 * dt);
     S.demo.base.t += dt;
-    if (inp.fire_p || inp.pick_p) { S.g = new Game(sfx); S.state = 'play'; sfx.play('start'); }
+    if (inp.fire_p || inp.pick_p) {
+      S.g = new Game(sfx); S.state = 'play'; sfx.setPaused(false);
+      sfx.setAmbience(S.g.profile().theme, false); sfx.play('start');
+    }
   } else if (S.state === 'play') {
     S.g.update(dt, inp);
+    sfx.setAmbience(S.g.profile().theme, false);
     if (S.g.over) {
       S.state = 'over'; S.overT = 0;
+      sfx.setPaused(true);
       if (S.g.score > S.hiscore) { S.hiscore = S.g.score; saveHi(S.hiscore); }
     }
   } else if (S.state === 'over') {
     S.overT += dt;
     S.g.updateFx(dt);
-    if (S.overT > 1.5 && (inp.fire_p || inp.pick_p)) S.state = 'title';
+    if (S.overT > 1.5 && (inp.fire_p || inp.pick_p)) { S.state = 'title'; sfx.setAmbience(null); }
   }
   edges = new Set();
 }
@@ -1001,7 +1114,7 @@ function runSelftest(n) {
   const ms = performance.now() - t0;
   sfx.init();
   const nb = Object.keys(sfx.buf).length;
-  const audio = sfx.ctx ? `audio=${sfx.ctx.state} sfx=${nb} music=${sfx.music ? (MUSIC_DATA.data.length / MUSIC_DATA.sr).toFixed(1) + 's' : 'none'}` : 'audio=unavailable';
+  const audio = sfx.ctx ? `audio=${sfx.ctx.state} buffers=${nb} ambience=${Object.keys(AMBIENT_RECIPES).length} music=${sfx.music ? (MUSIC_DATA.data.length / MUSIC_DATA.sr).toFixed(1) + 's' : 'none'}` : 'audio=unavailable';
   out.textContent = `SELFTEST OK frames=${n} games=${games} maxLevel=${maxLevel} ms=${ms.toFixed(0)} ${audio}`;
   document.title = out.textContent;
 }

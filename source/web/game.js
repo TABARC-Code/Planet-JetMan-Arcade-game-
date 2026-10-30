@@ -14,7 +14,7 @@
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.6.0';
+const VERSION = '4.7.0';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;
@@ -658,7 +658,7 @@ class Game {
     if (a.hp > 0) {
       a.hitT = ALIEN_HIT_FLASH;
       this.explode(a.x, a.y, 6, 'WY', 30, 0.3);
-      this.sfx.play('hit');
+      this.sfx.play(a.kind === 'heavy' ? 'heavyhit' : 'hit');
       return false;
     }
     removeItem(this.aliens, a);
@@ -729,6 +729,7 @@ class Game {
     const b = this.base, y = this.terr.base(b.x) - 20;
     this.missiles.push(new Missile(wrap(b.x + 20), y, 'earth'));
     this.missiles.push(new Missile(wrap(b.x - 20), y, 'rover'));
+    this.sfx.play('missilewarn');
     this.sfx.play('launch');
     this.flash('WARNING: MISSILES LAUNCHED AT EARTH AND ROVER!', 3);
   }
@@ -811,6 +812,7 @@ class Game {
         this.timer = this.levelTime();
         this.items.push(new Item('bomb', HOME_X + 4, GROUND - 40));
         const p = this.profile();
+        this.sfx.play('levelup');
         this.flash(`LEVEL ${this.level}: ${p.name} - ${p.briefing}`, 4);
       }
     }
