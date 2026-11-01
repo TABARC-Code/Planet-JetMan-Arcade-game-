@@ -32,6 +32,10 @@ const ITEM_ART = {
   bridge: ['OOOOOOOOOOOOOO', 'OO.OO.OO.OO.OO', 'O.O..O..O..O.O', 'OOOOOOOOOOOOOO', 'ww..........ww'],
   cannon: ['........wwww', '......wwWWw.', '....wwWWw...', '..wWWWw.....',
     '.wWWWWWw....', 'wwwwwwwww...', '.K.....K....'],
+  supply: ['..CCCCCC..', '.CWWWWWWC.', 'CWWYYYYWWC', 'CWWYYYYWWC',
+    'CWWWWWWWWC', '.CCCCCCCC.', '..KK..KK..'],
+  repair: ['...OOOO...', '..OWWWWOO.', '.OWWCCWWO.', 'OWWCCCCWWO',
+    'OWWWCCWWWO', '.OOWWWWOO.', '..KKKKKK..'],
 };
 
 function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -469,9 +473,10 @@ function drawRover(c, g, now) {
   R(c, PALC.B, tsx - 10, ty - 6, 20, 2);
   wheel(tsx - 7, ty - 3, r.wheel, 3);
   wheel(tsx + 7, ty - 3, r.wheel, 3);
-  if (r.cargo) {
-    const spr = art.item[r.cargo.kind + '_' + (r.cargo.kind === 'cannon' ? d : 1)];
-    c.drawImage(spr, tsx - (spr.width >> 1), ty - 9 - spr.height);
+  for (const [slot, cargo] of [r.cargo, r.cargo2].entries()) {
+    if (!cargo) continue;
+    const spr = art.item[cargo.kind + '_' + (cargo.kind === 'cannon' ? d : 1)];
+    c.drawImage(spr, tsx - (spr.width >> 1) + slot * d * 7, ty - 9 - spr.height - slot * 3);
   }
 
   for (const o of [-13, 0, 13]) {
@@ -531,19 +536,21 @@ function drawHud(f, g, now, hiscore) {
   text(f, 30, 'SCORE ' + pad(g.score, 6), 16, 4, PALC.Y);
   text(f, 30, 'HI ' + pad(Math.max(hiscore, g.score), 6), 330, 4, PALC.C);
   const look = levelLook(g);
-  text(f, 30, `LEVEL ${g.level} ${g.levelName ? g.levelName() : ''}`, 590, 4, look.accent);
+  text(f, 30, `LEVEL ${g.level} ${g.mission ? g.mission.name : (g.levelName ? g.levelName() : '')}`, 590, 4, look.accent);
   f.imageSmoothingEnabled = false;
   for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 780 + i * 28, 4, 22, 27);
   text(f, 30, 'EARTH', 1040, 4, PALC.B);
   for (let i = 0; i < 3; i++) R(f, i < g.earthHits ? PALC.R : PALC.G, 1150 + i * 38, 10, 30, 18);
   text(f, 22, 'FUEL', 16, 40, PALC.W);
   R(f, 'rgb(60,60,70)', 78, 43, 200, 18);
-  R(f, g.p.fuel > 35 ? PALC.G : (g.p.fuel > 15 ? PALC.Y : PALC.R), 78, 43, trunc(2 * g.p.fuel), 18);
+  const fuelRatio = Math.max(0, Math.min(1, g.p.fuel / (g.fuelCapacity || 100)));
+  R(f, fuelRatio > 0.35 ? PALC.G : (fuelRatio > 0.15 ? PALC.Y : PALC.R), 78, 43, trunc(200 * fuelRatio), 18);
   if (g.base.alive) {
     text(f, 22, 'BASE COUNTDOWN ' + pad(g.timer, 3), 300, 40, g.timer < 15 && trunc(now * 4) % 2 ? PALC.R : PALC.W);
   } else text(f, 22, 'BASE DESTROYED', 300, 40, PALC.G);
   const r = g.rover;
-  text(f, 22, `ROVER BRIDGES ${r.bridges}  TRAILER ${r.cargo ? r.cargo.kind.toUpperCase() : 'EMPTY'}`, 590, 40, PALC.O);
+  const cargo = [r.cargo, r.cargo2].filter(Boolean).map(it => it.kind.toUpperCase()).join('+') || 'EMPTY';
+  text(f, 22, `ROVER ${r.disabled ? 'DISABLED' : 'READY'}  BRIDGES ${r.bridges}  CARGO ${cargo}`, 590, 40, r.disabled ? PALC.R : PALC.O);
   text(f, 22, 'CARRYING ' + (g.p.carry ? g.p.carry.kind.toUpperCase() : '-'), 1040, 40, PALC.W);
   // scanner: whole moon in one strip, centred on the camera
   const sx0 = 16, sy0 = 66, sw = HI_W - 32, sh = 10;
@@ -556,14 +563,14 @@ function drawHud(f, g, now, hiscore) {
   for (const tp of g.tele) R(f, PALC.C, px(tp) - 2, sy0 + 1, 4, 3);
   R(f, PALC.B, px(HOME_X) - 3, sy0 + 1, 6, 8);
   if (g.base.alive) R(f, trunc(now * 4) % 2 ? PALC.R : PALC.Y, px(g.base.x) - 4, sy0, 8, sh);
-  for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w }[it.kind], px(it.x) - 1, sy0 + 2, 3, 3);
+  for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w, supply: PALC.C, repair: PALC.G }[it.kind], px(it.x) - 1, sy0 + 2, 3, 3);
   for (const a of g.aliens) R(f, PALC.M, px(a.x), sy0 + 3, 2, 2);
   for (const m of g.missiles) R(f, PALC.R, px(m.x) - 2, sy0 + 1, 4, 8);
   R(f, PALC.W, px(g.rover.x) - 3, sy0 + 3, 7, 5);
   if (!g.p.inRover) R(f, PALC.C, px(g.p.x) - 1, sy0 + 1, 3, 8);
-  if (g.base.alive) {
-    const d = wdx(g.base.x, g.cam);
-    if (Math.abs(d) > W / 2) text(f, 22, d > 0 ? 'BASE >>' : '<< BASE', d > 0 ? HI_W - 150 : 20, 90, PALC.R);
+  if (g.mission && !g.mission.completed) {
+    const d = wdx(g.missionTargetX(), g.cam);
+    if (Math.abs(d) > W / 2) text(f, 22, d > 0 ? 'OBJECTIVE >>' : '<< OBJECTIVE', d > 0 ? HI_W - 210 : 20, 90, PALC.Y);
   }
   if (r.blocked && g.p.inRover) {
     const instruction = r.bridges ? 'CRATER AHEAD — PRESS X TO LAY A BRIDGE' : 'CRATER AHEAD — NO BRIDGES';
@@ -594,7 +601,7 @@ const TITLE_LINES = [
   ['P  M  N  B  F  F2  F3  ESC', 'PAUSE  MUTE  MUSIC  AMBIENCE  FULLSCREEN  DATA  PAD SETUP  TITLE'],
 ];
 const HOWTO = [
-  'Carry the BOMB to the alien base and drop it from ABOVE.',
+  'Rotating missions: bomb run, supply recovery and rover repair.',
   "Drop items on the rover's trailer to haul them. Kits = bridges.",
   'Rover cannot cross craters: drop a bridge kit in, or press X.',
   'Rover refuels your jetpac. Aliens crashing make new craters!',
@@ -609,6 +616,10 @@ function drawTitle(f, now, hiscore) {
   for (const [k, v] of TITLE_LINES) { text(f, 22, k, 260, y, PALC.Y); text(f, 22, v, 560, y, PALC.W); y += 32; }
   y += 16;
   for (const l of HOWTO) { text(f, 22, l, HI_W / 2, y, 'rgb(190,190,220)', true); y += 30; }
+  const loadout = LOADOUTS[S.loadoutIndex];
+  text(f, 22, `LOADOUT ${S.loadoutIndex + 1}/4: ${loadout.name} — ${loadout.detail}`, HI_W / 2, 610, PALC.Y, true);
+  text(f, 20, `LEFT/RIGHT OR 1-4 SELECT  •  UP/DOWN OR T: ${S.classic ? 'CLASSIC — THREE LIVES, FASTER WAVES, NO KIT RESCUE' : 'ARCADE — FOUR LIVES, DEPOT KIT RESCUE'}`,
+    HI_W / 2, 642, S.classic ? PALC.R : PALC.G, true);
   if (trunc(now * 2) % 2) text(f, 30, touchMode ? 'TAP FIRE TO START' : 'PRESS FIRE TO START', HI_W / 2, 680, PALC.G, true);
   text(f, 22, 'HI-SCORE ' + pad(hiscore, 6), HI_W / 2, 735, PALC.C, true);
   text(f, 16, `VERSION ${VERSION}  -  ART & SOUND CREDITS: SEE CREDITS`, HI_W / 2, 770, 'rgb(120,120,150)', true, false);
@@ -819,6 +830,8 @@ function pollInput(inp) {
   inp.right = !suppressFrame && (has('right') || pad.held.right);
   inp.up = !suppressFrame && (has('up') || pad.held.up);
   inp.fire = !suppressFrame && (has('fire') || pad.held.fire);
+  inp.left_p = !suppressFrame && (edges.has('left') || pad.pressed.left);
+  inp.right_p = !suppressFrame && (edges.has('right') || pad.pressed.right);
   inp.up_p = !suppressFrame && (edges.has('up') || pad.pressed.up);
   inp.down_p = !suppressFrame && (edges.has('down') || pad.pressed.down);
   inp.pick_p = !suppressFrame && (edges.has('pick') || pad.pressed.pick);
@@ -853,6 +866,7 @@ function toggleFullscreen() {
 }
 
 const S = { state: 'title', demo: null, g: null, overT: 0, now: 0, hiscore: loadHi(), inp: newInput(),
+  loadoutIndex: 1, classic: false,
   notice: null, lostPad: null, showTelemetry: false,
   pad: { activeIndex: null, connectedCount: 0, waitingNeutral: [] } };
 
@@ -959,6 +973,8 @@ window.addEventListener('keydown', e => {
   if (a) e.preventDefault();
   if (!e.repeat) {
     if (a) edges.add(a);
+    if (S.state === 'title' && /^Digit[1-4]$/.test(e.code)) S.loadoutIndex = Number(e.code.slice(-1)) - 1;
+    if (S.state === 'title' && e.code === 'KeyT') S.classic = !S.classic;
     if (e.code === 'KeyP') edges.add('pause');
     if (e.code === 'KeyM') sfx.setMuted(!sfx.muted);
     if (e.code === 'KeyN') { sfx.musicOn = !sfx.musicOn; sfx.setMusic(S.state === 'pause'); }
@@ -1015,8 +1031,11 @@ function step(dt) {
   if (S.state === 'title') {
     S.demo.cam = wrap(S.demo.cam + 30 * dt);
     S.demo.base.t += dt;
+    if (inp.left_p || inp.right_p) S.loadoutIndex = mod(S.loadoutIndex + (inp.right_p ? 1 : -1), LOADOUTS.length);
+    if (inp.up_p || inp.down_p) S.classic = !S.classic;
     if (inp.fire_p || inp.pick_p) {
-      S.g = new Game(sfx); S.state = 'play'; sfx.setPaused(false);
+      S.g = new Game(sfx, undefined, { loadout: LOADOUTS[S.loadoutIndex].id, classic: S.classic });
+      S.state = 'play'; sfx.setPaused(false);
       sfx.setAmbience(S.g.profile().theme, false); sfx.play('start');
     }
   } else if (S.state === 'play') {

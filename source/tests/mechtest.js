@@ -2,10 +2,11 @@
 // If these pass and the Python ones pass, the two copies probably still agree. Probably.
 'use strict';
 const L = require('../web/game.js');
-const { Game, Alien, Missile, LEVEL_PROFILES, levelProfile, newInput, wrap, wdx } = L;
+const { Game, Alien, Missile, LEVEL_PROFILES, levelProfile, MISSION_TYPES, missionForLevel,
+  LOADOUTS, newInput, wrap, wdx } = L;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exit(1); } };
 
-const G = () => { const g = new Game(null, 5); g.spawnT = 1e9; return g; };
+const G = (options = {}) => { const g = new Game(null, 5, options); g.spawnT = 1e9; return g; };
 function run(g, n, keys = {}) {
   const inp = newInput();
   for (let f = 0; f < n; f++) {
@@ -25,6 +26,29 @@ assert(levelProfile(7).time === 75 && levelProfile(7).maxAliens === 9 && levelPr
   'post-profile escalation preserves the established limits');
 console.log('level profiles ok');
 
+assert(MISSION_TYPES.length === 3 && missionForLevel(1).id === 'bomb'
+  && missionForLevel(2).id === 'supply' && missionForLevel(3).id === 'repair'
+  && missionForLevel(4).id === 'bomb', 'three missions rotate by level');
+assert(LOADOUTS.length === 4, 'four rover loadouts');
+let load = G({ loadout: 'cannon' });
+assert(load.hasCargo('cannon') && load.rover.bridges === 2 && load.rover.cargoCapacity === 1,
+  'cannon loadout trades cargo space for immediate firepower');
+load = G({ loadout: 'bridge' });
+assert(!load.hasCargo('cannon') && load.rover.bridges === 4, 'bridge reserve starts with four kits');
+load = G({ loadout: 'fuel' });
+assert(load.fuelCapacity === 135 && load.p.fuel === 135 && load.rover.bridges === 2,
+  'fuel reserve extends range without adding weapons');
+load = G({ loadout: 'cargo' });
+const extraA = new L.Item('supply', 10, 10), extraB = new L.Item('cannon', 10, 10);
+assert(load.stowCargo(extraA) && load.stowCargo(extraB) && load.cargoCount() === 2,
+  'cargo rack holds two items and nothing else is quietly upgraded');
+let hard = G({ loadout: 'bridge', classic: true });
+assert(hard.lives === 3 && hard.levelTime() === 128 && hard.maxAliens() === 4
+  && hard.spawnDelay() < levelProfile(1).spawn, 'classic mode is faster and starts one life down');
+hard.items = hard.items.filter(it => it.kind !== 'bridge'); hard.timer = 1e9;
+run(hard, 1000); assert(!hard.items.some(it => it.kind === 'bridge'), 'classic mode has no depot kit rescue');
+console.log('missions, loadouts and classic mode ok');
+
 let g = G(), p = g.p;
 const levelHeard = []; g.sfx = { play: name => levelHeard.push(name), loop() {}, stopLoops() {} };
 const bomb = g.items.find(i => i.kind === 'bomb');
@@ -38,6 +62,19 @@ assert(g.stats.levelTransitions === 1, 'level transition counted once');
 assert(levelHeard.filter(n => n === 'levelup').length === 1, 'level transition has one stinger');
 console.log('bomb ok');
 
+g = G({ loadout: 'cargo' }); g.level = 2; g.placeBase(); g.startMission(); g.timer = 90;
+const supply = g.items.find(i => i.kind === 'supply');
+assert(supply && g.mission.id === 'supply', 'supply recovery creates one stranded crate');
+g.stowCargo(supply); g.rover.x = L.HOME_X; g.updateMission();
+assert(g.mission.completed && !g.base.alive && !g.hasCargo('supply'), 'supply mission completes only at the depot');
+
+g = G({ loadout: 'bridge' }); g.level = 3; g.placeBase(); g.startMission(); g.timer = 90;
+const repair = g.items.find(i => i.kind === 'repair');
+assert(repair && g.rover.disabled && g.mission.id === 'repair', 'repair mission starts with a disabled rover');
+g.p.carry = repair; repair.state = 'held'; g.enterRover();
+assert(!g.rover.disabled && g.mission.completed && !g.p.inRover, 'repair module restores the rover and completes the job');
+console.log('rotating mission completion ok');
+
 g = G(); p = g.p; let c = g.terr.craters[0];
 const kit = g.items.find(i => i.kind === 'bridge');
 run(g, 120); p.carry = kit; kit.state = 'held'; p.x = c.x; p.y = 60; p.onGround = false;
@@ -45,11 +82,12 @@ run(g, 1, { pick_p: true }); run(g, 90); assert(c.bridged, 'kit bridges crater')
 
 g = G(); p = g.p; let r = g.rover; c = g.terr.craters[1];
 r.x = wrap(c.x - c.r - 40); r.dir = 1; p.inRover = true;
+const bridgeStock = r.bridges;
 for (let f = 0; f < 300 && g.stats.roverBlockEvents === 0; f++) run(g, 1, { right: true });
 assert(r.blocked === c, 'rover blocked');
 assert(g.stats.roverBlockEvents === 1 && r.blockedPulse > 0, 'rover blockage counted once with pulse');
 run(g, 60, { right: true }); assert(g.stats.roverBlockEvents === 1, 'held drive does not repeat blockage event');
-run(g, 1, { pick_p: true }); assert(c.bridged && r.bridges === 1, 'rover lays bridge');
+run(g, 1, { pick_p: true }); assert(c.bridged && r.bridges === bridgeStock - 1, 'rover lays bridge');
 assert(g.stats.roverBridgesLaid === 1, 'bridge recovery counted once');
 run(g, 200, { right: true }); assert(wdx(r.x, c.x) > 0, 'rover crossed'); console.log('rover bridge ok');
 

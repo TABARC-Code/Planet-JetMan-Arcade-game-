@@ -1,6 +1,19 @@
-# Test report — v4.7.0
+# Test report — v4.8.0-dev.1
 
-Tested on 28 October 2026 from the v4.7.0 release source.
+Tested on 1 November 2026 from the development branch.
+
+## Development milestone
+
+- Mission rotation, all four loadouts and every new completion path passed.
+- Classic mode passed its lives, timing, wave-pressure and no-kit-rescue checks.
+- The built browser completed a 12,000-frame soak without page or console errors.
+- The source produced a valid single-file browser build.
+- Project-facing wording contains no prohibited development-tool references.
+
+A physical-controller playthrough remains unverified. Hardware remains hardware,
+obstinately.
+
+The v4.7.0 regression record follows and remains applicable.
 
 ## Passed
 

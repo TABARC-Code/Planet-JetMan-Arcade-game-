@@ -1,4 +1,20 @@
-# Programmer notes — browser 4.7.0
+# Programmer notes — browser 4.8.0 development
+
+The first pass rotates three jobs rather than merely repainting the bomb run. The
+supply crate has to return on the trailer; the repair module must be carried back
+to a rover which, for once, is genuinely broken rather than displaying a stern
+message and carrying on regardless.
+
+I made the loadouts lateral choices. The cannon gives immediate teeth, bridge
+reserve buys route freedom, fuel reserve extends Jetman's reach, and the cargo rack
+hauls two items. None secretly includes the others. Classic mode then removes a
+life, shortens the clock, thickens the waves and stops the depot quietly replacing
+lost bridge kits. It is severe, but every threat still uses the existing warnings.
+
+Next I want enemy pairings and salvage drops. Both need restraint: coordinated
+aliens should create decisions, not form a committee devoted to sitting on Jetman.
+
+## v4.7.0 notes
 
 For 4.7.0 I replaced the two silhouettes that still looked like placeholders.
 Jetman now has one shared 17-pixel body across idle, two walking strides and flight,

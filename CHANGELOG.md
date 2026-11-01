@@ -1,5 +1,28 @@
 # Change log
 
+## v4.8.0-dev.1 — 1 November 2026
+
+This development milestone adds the first new mission structure without pretending
+the full 4.8.0 release is finished.
+
+### Added
+
+- Three rotating jobs: bomb run, stranded-supply recovery and emergency rover repair.
+- Four mutually exclusive rover loadouts: cannon, bridge reserve, fuel reserve or
+  a two-slot cargo rack.
+- A selectable Classic mode with three lives, shorter deadlines, faster and denser
+  waves, tougher missiles and no automatic replacement bridge kits.
+- New original supply-crate and repair-module sprites, objective scanner markers
+  and mission-specific HUD messages.
+- Regression coverage for mission order and completion, every loadout trade-off and
+  the removal of the bridge-kit safety net in Classic mode.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.1`; it is not the final release.
+- Enemy combinations, salvage, level events, secondary objectives and major
+  encounters remain later work.
+
 ## v4.7.0 — 28 October 2026
 
 This release completes the JavaScript audio pass and replaces the remaining

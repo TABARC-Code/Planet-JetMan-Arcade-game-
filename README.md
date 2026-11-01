@@ -1,4 +1,7 @@
-# Lunar Jetman — browser release 4.7.0
+# Lunar Jetman — 4.8.0 development branch
+
+This branch contains the tested `4.8.0-dev.1` mission and loadout milestone. It is
+playable, but it is not the final 4.8.0 release package.
 
 Open `index.html` in a modern desktop browser. It is the complete game: artwork,
 generated sound and music are embedded, so no installation or network connection
@@ -34,6 +37,13 @@ The controller panel has separate horizontal, thrust and board/descend dead zone
 plus an optional release buffer for noisy sticks. The defaults reproduce 4.5.0's
 input response. Six named level profiles stage enemy introductions, scenery and
 their own generated ambience; scenery does not alter collision geometry.
+
+The first three missions rotate between bomb delivery, stranded-supply recovery
+and emergency rover repair. Before starting, choose one rover loadout with Left or
+Right, or keys 1–4: cannon, bridge reserve, fuel reserve or cargo rack. Press T, Up
+or Down on the title screen to toggle Classic mode. Classic starts with three lives,
+shorter deadlines, faster waves, tougher missiles and no automatic replacement
+bridge kits. It is meant to be difficult; the warnings remain fair.
 
 Jetman and the rover now use original, higher-detail pixel art. Jetman's four poses
 share a stable 17×20 design, while the rover has a 42-pixel outlined chassis,
