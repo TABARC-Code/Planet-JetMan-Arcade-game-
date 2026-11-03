@@ -4,7 +4,7 @@ For 4.7.0 I replaced the two silhouettes that still looked like placeholders.
 Jetman now has one shared 17-pixel body across idle, two walking strides and flight,
 so his visor, pack and chest panel stay attached to the same person. The rover now
 has a properly outlined chassis, three articulated wheel positions, a readable cab
-and a trailer which appears engineered rather than mildly embarrassed.
+and a trailer which appears engineered rather than mildly embarrassed. (it was 4am it looked good at the time.)
 
 I reviewed two CC0 platformer sheets for scale and pose rhythm, then kept their
 pixels out of the build. The result is original project art, fixed to the existing
@@ -14,19 +14,18 @@ The audio system grew up at the same time. Effects and ambience now use separate
 buses, a 16-voice priority limit and short warning ducking. Six level beds provide
 radio hiss, relay chatter and low machinery without inventing lunar weather. Heavy
 damage, missile launch and level transition each gained their own cue. Everything
-is still generated in JavaScript.
+is still generated in JavaScript. (I hate those no uploads of wav file sites.)
 
 Future ideas: a boarding animation, cannon recoil and a rover damage state. I have
 left them out until the new scale has survived ordinary play; enthusiasm remains a
-poor substitute for collision testing.
+poor substitute for collision testing. maybe
 
 ## v4.6.0 notes
 
 For 4.6.0 I turned the difficulty curve into six named profiles. The same moon now
 develops a recognisable geography: Dust Plain rocks, Static Valley aerials, Crater
 Belt crystals, Red Terminator pylons, Iron Waste girders and Black Sky obelisks.
-They are deliberately decorative. A scenic rock which stops the rover is merely a
-bug wearing a small hat.
+They are deliberately decorative. fixed a couple of bugs.
 
 The controller panel exposes the thresholds that used to be constants. I kept the
 old values as defaults, split upward thrust from downward boarding, and added a
@@ -56,7 +55,7 @@ stubborn second on the accelerator becomes sixty alleged design disasters.
 F2 exposes those figures locally. They are deliberately plain counters, with no
 network, persistent identifier or analytics theatre. I also repaired release
 provenance and wrote a browser-only package guide after noticing that the previous
-README advertised several files the ZIP did not contain.
+README advertised several files the ZIP did not contain. No idea, sure felt real at the time. 
 
 The controller-settings proposal—dead-zone hysteresis, accessible diagnostics and
 optional rumble—belongs in its own release. It touches persistence, menu focus and
@@ -65,7 +64,7 @@ credible. I have left that as an idea for a later release.
 
 ## Controller recovery implementation notes
 
-I started with the files, not the folklore. The available project was a plain
+I started with the files, not the stuff I thought was real. (ADHD,). The available project was a plain
 folder rather than a repository, and its browser source had no reliable embedded
 release marker. The project owner subsequently supplied the v4.4.0 release record.
 That makes controller recovery, proper damaged sprites and audio warnings v4.5.0
@@ -84,8 +83,7 @@ the single-file build still carries everything it needs.
 
 For sound, I kept the countdown pip and made a separate descending double warning.
 It now marks low fuel and an active controller loss. Enemy damage keeps its blunt
-hit sound; mixing every alert into the same siren would be efficient in the way a
-smoke alarm wired to the doorbell is efficient.
+hit sound; mixing every alert into the same siren would be kind of efficient in the same way a smoke alarm wired to the doorbell is efficient.( note to self move smoke alarm.)
 
 Future ideas I deliberately left on the bench: light controller rumble for a
 surviving heavy, a small settings panel for dead zones and volume, and an on-screen
