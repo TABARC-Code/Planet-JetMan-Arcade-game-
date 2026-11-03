@@ -1,4 +1,4 @@
-# Lunar Jetman — browser release 4.7.0
+# planet Jetman — browser release 4.7.0
 
 Open `index.html` in a modern desktop browser. It is the complete game: artwork,
 generated sound and music are embedded, so no installation or network connection
