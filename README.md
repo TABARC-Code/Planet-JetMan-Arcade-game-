@@ -1,7 +1,8 @@
 # Lunar Jetman — 4.8.0 development branch
 
-This branch contains the tested `4.8.0-dev.1` mission and loadout milestone. It is
-playable, but it is not the final 4.8.0 release package.
+This branch contains the tested `4.8.0-dev.2` enemy-combination and salvage
+milestone, building on the mission and loadout work in dev.1. It is playable, but
+it is not the final 4.8.0 release package.
 
 Open `index.html` in a modern desktop browser. It is the complete game: artwork,
 generated sound and music are embedded, so no installation or network connection
@@ -44,6 +45,12 @@ Right, or keys 1–4: cannon, bridge reserve, fuel reserve or cargo rack. Press 
 or Down on the title screen to toggle Classic mode. Classic starts with three lives,
 shorter deadlines, faster waves, tougher missiles and no automatic replacement
 bridge kits. It is meant to be difficult; the warnings remain fair.
+
+Enemies now combine their existing strengths: divers use heavies to shape an
+escape route, chasers screen missile sites, and UFOs raid loose cargo. Destroyed
+enemies occasionally leave fuel cells, laser cells or unstable technology. The
+first two are immediate supplies; unstable technology pays well at the rover and
+explodes after nine seconds if enthusiasm outruns judgement.
 
 Jetman and the rover now use original, higher-detail pixel art. Jetman's four poses
 share a stable 17×20 design, while the rover has a 42-pixel outlined chassis,

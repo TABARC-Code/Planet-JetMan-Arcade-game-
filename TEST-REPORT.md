@@ -1,13 +1,17 @@
-# Test report — v4.8.0-dev.1
+# Test report — v4.8.0-dev.2
 
-Tested on 1 November 2026 from the development branch.
+Tested on 5 November 2026 from the development branch.
 
 ## Development milestone
 
-- Mission rotation, all four loadouts and every new completion path passed.
-- Classic mode passed its lives, timing, wave-pressure and no-kit-rescue checks.
-- The built browser completed a 12,000-frame soak without page or console errors.
-- The source produced a valid single-file browser build.
+- Diver/heavy herding, chaser site defence and UFO cargo theft/recovery passed.
+- Fuel cells, rapid-fire laser cells, unstable delivery, fuse detonation and the
+  deterministic salvage-drop gate passed.
+- Mission rotation, all four loadouts, Classic mode and the complete earlier
+  mechanics, controller, art and audio suites passed again.
+- The rebuilt 207 KB single-file browser completed a 12,000-frame soak:
+  `SELFTEST OK frames=12000 games=1 maxLevel=1 ms=12273 audio=suspended buffers=28 ambience=6 music=30.0s`.
+- The browser console contained no warnings or errors during that soak.
 - Project-facing wording contains no prohibited development-tool references.
 
 A physical-controller playthrough remains unverified. Hardware remains hardware,

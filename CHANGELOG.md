@@ -1,5 +1,32 @@
 # Change log
 
+## v4.8.0-dev.2 — 5 November 2026
+
+This milestone gives existing enemies jobs to do together and adds salvage which
+can help, distract or detonate. The final 4.8.0 release is still in development.
+
+### Added
+
+- Divers use nearby heavies to threaten the clear side of Jetman, making the
+  heavy's side the obvious — and unpleasant — escape route.
+- Chasers screen active missile sites during bomb runs, then break formation when
+  Jetman enters the interception area.
+- UFOs can lift unattended mission cargo and salvage. Shooting the carrier drops
+  its load; an escaping UFO relocates it rather than making a mission unwinnable.
+- Enemy kills have a 24% salvage chance. Fuel cells restore fuel, laser cells give
+  ten seconds of rapid fire, and unstable technology awards 1,000 points if it
+  reaches the rover before its nine-second fuse expires.
+- Original JavaScript pixel sprites, scanner colours, HUD feedback and session
+  counters for the three salvage types and coordinated enemy actions.
+- Regression coverage for herding aim, site defence, cargo theft and recovery,
+  salvage rewards, rapid fire, unstable detonation and the drop gate.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.2`; it is not the final release.
+- Level events, secondary objectives, progression and a major encounter remain
+  later work on the release branch.
+
 ## v4.8.0-dev.1 — 1 November 2026
 
 This development milestone adds the first new mission structure without pretending

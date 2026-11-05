@@ -1,5 +1,22 @@
 # Programmer notes — browser 4.8.0 development
 
+For dev.2 I stopped treating each alien as a private contractor. Divers now use a
+nearby heavy to close the comfortable escape lane, chasers screen the missile site,
+and UFOs collect loose cargo. A carrier which gets away relocates the item instead
+of deleting the mission. Malice is acceptable; a soft lock is merely paperwork.
+
+Salvage is deliberately uneven. Fuel and laser cells are quick practical wins.
+Unstable technology is worth 1,000 points at the rover, but its nine-second fuse
+keeps running in Jetman's hands and under a UFO. The player can ignore it. That
+choice matters more than another automatic upgrade staircase.
+
+The rules, original pixel sprites, HUD, scanner and deterministic checks moved
+together. No collision boxes changed. Next I want level events and optional
+objectives, with enough warning that difficulty still feels old-school rather
+than arbitrary.
+
+## v4.8.0-dev.1 notes
+
 The first pass rotates three jobs rather than merely repainting the bomb run. The
 supply crate has to return on the trailer; the repair module must be carried back
 to a rover which, for once, is genuinely broken rather than displaying a stern
@@ -11,8 +28,9 @@ hauls two items. None secretly includes the others. Classic mode then removes a
 life, shortens the clock, thickens the waves and stops the depot quietly replacing
 lost bridge kits. It is severe, but every threat still uses the existing warnings.
 
-Next I want enemy pairings and salvage drops. Both need restraint: coordinated
-aliens should create decisions, not form a committee devoted to sitting on Jetman.
+The enemy pairings and salvage drops moved into dev.2 after their own regression
+pass. Coordinated aliens still aren't allowed to form a committee devoted to
+sitting on Jetman.
 
 ## v4.7.0 notes
 

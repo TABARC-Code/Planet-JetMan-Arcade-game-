@@ -155,6 +155,41 @@ console.log('enemy damage state ok');
 g = G(); g.level = 6; const u = new Alien('ufo', wrap(g.p.x + 60), 60, 1, 45); g.aliens.push(u); g.cam = g.p.x;
 run(g, 600); assert(!g.terr.craters.some(c2 => Math.abs(wdx(c2.x, u.x)) < 5) , 'ufo never cratered'); console.log('ufo ok');
 
+g = G();
+const herdHeavy = new Alien('heavy', wrap(g.p.x - 45), 70, 1, 0);
+const herdDiver = new Alien('diver', g.p.x, 55, 1, 0);
+g.aliens.push(herdHeavy, herdDiver);
+const herdAim = g.diverAim(herdDiver);
+assert(herdAim.herded && wdx(herdAim.x, g.p.x) > 0, 'diver threatens the clear side and leaves the heavy-side escape');
+g.level = 4; g.startMission(); g.base.x = wrap(g.p.x + 700);
+const guard = new Alien('chaser', g.p.x, 60, 1, 30);
+const guardAim = g.chaserTarget(guard);
+assert(guardAim.guarding && Math.abs(wdx(guardAim.x, g.base.x)) <= 82, 'chaser holds a readable missile-site screen');
+
+const loose = new L.Item('supply', guard.x, 60); loose.state = 'ground'; g.items.push(loose);
+const thief = new Alien('ufo', loose.x, loose.y, 1, 40); g.aliens.push(thief);
+assert(g.stealCargo(thief, loose) && loose.state === 'stolen' && thief.cargo === loose, 'ufo lifts unattended cargo');
+g.killAlien(thief);
+assert(loose.state === 'fall' && !loose.heldBy && !thief.cargo, 'shooting the ufo releases its cargo');
+console.log('enemy combinations ok');
+
+g = G(); g.p.fuel = 20;
+const fuel = g.spawnSalvage('fuelcell', g.p.x, g.p.y);
+assert(g.collectSalvage(fuel) && g.p.fuel === 50, 'fuel salvage restores a bounded amount');
+const cells = g.spawnSalvage('ammo', g.p.x, g.p.y);
+assert(g.collectSalvage(cells) && g.p.rapidT === L.RAPID_FIRE_TIME, 'laser cells enable timed rapid fire');
+const tech = g.spawnSalvage('unstable', g.p.x, g.p.y);
+g.p.carry = tech; tech.state = 'held';
+const salvageScore = g.score;
+assert(g.secureUnstable(tech) && g.score === salvageScore + 1000, 'unstable tech pays only when secured');
+const doomed = g.spawnSalvage('unstable', wrap(g.p.x + 200), 60); doomed.unstableT = 0.001; doomed.state = 'ground';
+g.updateItems(0.01);
+assert(!g.items.includes(doomed) && g.booms.some(b => b[3] === 'big'), 'ignored unstable tech detonates');
+g.rng.random = () => 0; g.rng.choice = () => 'fuelcell';
+const donor = new Alien('drifter', wrap(g.p.x + 30), 70, 1, 0); g.aliens.push(donor); g.killAlien(donor);
+assert(g.items.some(it => it.kind === 'fuelcell') && g.stats.salvageDrops >= 4, 'enemy kills use the tested salvage drop gate');
+console.log('salvage ok');
+
 // sound is code now - make sure every recipe and the music render to something sane
 const { SFX_RECIPES, renderSfx } = require('../web/sfx.js');
 for (const k in SFX_RECIPES) {

@@ -36,6 +36,12 @@ const ITEM_ART = {
     'CWWWWWWWWC', '.CCCCCCCC.', '..KK..KK..'],
   repair: ['...OOOO...', '..OWWWWOO.', '.OWWCCWWO.', 'OWWCCCCWWO',
     'OWWWCCWWWO', '.OOWWWWOO.', '..KKKKKK..'],
+  fuelcell: ['..GGGG..', '.GWWWWG.', 'GWWGGWWG', 'GWWGGWWG',
+    'GWWGGWWG', '.GWWWWG.', '..GGGG..'],
+  ammo: ['..YYYYYY..', '.YKKKKKKY.', 'YKKWYYWKKY', 'YKKWYYWKKY',
+    'YKKKKKKKKY', '.YYYYYYYY.', '..KK..KK..'],
+  unstable: ['....MM....', '..MMCCMM..', '.MCCWWCCM.', 'MCCWYYWCCM',
+    '.MCCWWCCM.', '..MMCCMM..', '....MM....'],
 };
 
 function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -341,6 +347,7 @@ function drawWorld(c, g, now) {
       const frames = bank[a.kind];
       const fr = frames[trunc(a.t * 8) % frames.length];
       c.drawImage(fr, sx - (fr.width >> 1), trunc(a.y) - (fr.height >> 1));
+      if (a.cargo) drawItem(c, g, a.cargo, 1);
     }
   }
   for (const m of g.missiles) {
@@ -536,9 +543,9 @@ function drawHud(f, g, now, hiscore) {
   text(f, 30, 'SCORE ' + pad(g.score, 6), 16, 4, PALC.Y);
   text(f, 30, 'HI ' + pad(Math.max(hiscore, g.score), 6), 330, 4, PALC.C);
   const look = levelLook(g);
-  text(f, 30, `LEVEL ${g.level} ${g.mission ? g.mission.name : (g.levelName ? g.levelName() : '')}`, 590, 4, look.accent);
+  text(f, 24, `L${g.level} ${g.mission ? g.mission.name : (g.levelName ? g.levelName() : '')}`, 590, 6, look.accent);
   f.imageSmoothingEnabled = false;
-  for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 780 + i * 28, 4, 22, 27);
+  for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 820 + i * 22, 5, 18, 22);
   text(f, 30, 'EARTH', 1040, 4, PALC.B);
   for (let i = 0; i < 3; i++) R(f, i < g.earthHits ? PALC.R : PALC.G, 1150 + i * 38, 10, 30, 18);
   text(f, 22, 'FUEL', 16, 40, PALC.W);
@@ -551,7 +558,8 @@ function drawHud(f, g, now, hiscore) {
   const r = g.rover;
   const cargo = [r.cargo, r.cargo2].filter(Boolean).map(it => it.kind.toUpperCase()).join('+') || 'EMPTY';
   text(f, 22, `ROVER ${r.disabled ? 'DISABLED' : 'READY'}  BRIDGES ${r.bridges}  CARGO ${cargo}`, 590, 40, r.disabled ? PALC.R : PALC.O);
-  text(f, 22, 'CARRYING ' + (g.p.carry ? g.p.carry.kind.toUpperCase() : '-'), 1040, 40, PALC.W);
+  const rapid = g.p.rapidT > 0 ? `  RAPID ${Math.ceil(g.p.rapidT)}` : '';
+  text(f, 22, 'CARRYING ' + (g.p.carry ? g.p.carry.kind.toUpperCase() : '-') + rapid, 1040, 40, g.p.rapidT > 0 ? PALC.Y : PALC.W);
   // scanner: whole moon in one strip, centred on the camera
   const sx0 = 16, sy0 = 66, sw = HI_W - 32, sh = 10;
   R(f, 'rgb(20,20,40)', sx0, sy0, sw, sh);
@@ -563,7 +571,8 @@ function drawHud(f, g, now, hiscore) {
   for (const tp of g.tele) R(f, PALC.C, px(tp) - 2, sy0 + 1, 4, 3);
   R(f, PALC.B, px(HOME_X) - 3, sy0 + 1, 6, 8);
   if (g.base.alive) R(f, trunc(now * 4) % 2 ? PALC.R : PALC.Y, px(g.base.x) - 4, sy0, 8, sh);
-  for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w, supply: PALC.C, repair: PALC.G }[it.kind], px(it.x) - 1, sy0 + 2, 3, 3);
+  for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w, supply: PALC.C,
+    repair: PALC.G, fuelcell: PALC.G, ammo: PALC.Y, unstable: PALC.M }[it.kind] || PALC.W, px(it.x) - 1, sy0 + 2, 3, 3);
   for (const a of g.aliens) R(f, PALC.M, px(a.x), sy0 + 3, 2, 2);
   for (const m of g.missiles) R(f, PALC.R, px(m.x) - 2, sy0 + 1, 4, 8);
   R(f, PALC.W, px(g.rover.x) - 3, sy0 + 3, 7, 5);
@@ -582,14 +591,15 @@ function drawHud(f, g, now, hiscore) {
 
 function drawTelemetry(f, g) {
   const s = g.stats, p = S.pad;
-  R(f, 'rgba(5,8,20,.88)', 18, 128, 360, 150);
-  strokeR(f, PALC.C, 18, 128, 360, 150);
+  R(f, 'rgba(5,8,20,.88)', 18, 128, 360, 170);
+  strokeR(f, PALC.C, 18, 128, 360, 170);
   text(f, 18, 'FIELD TELEMETRY — F2 CLOSES', 34, 140, PALC.C);
   text(f, 16, `DIVER WARN ${s.diverTelegraphs}  LAUNCH ${s.diverLaunches}  CRASH ${s.diverCrashes}`, 34, 174, PALC.W);
   text(f, 16, `DIVER HITS ${s.diverPlayerHits}  ROVER BLOCKS ${s.roverBlockEvents}`, 34, 202, PALC.W);
-  text(f, 16, `BRIDGES LAID ${s.roverBridgesLaid}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 230, PALC.W);
+  text(f, 16, `HERDS ${s.diverHerds}  GUARDS ${s.chaserGuards}  THEFTS ${s.cargoThefts}`, 34, 230, PALC.W);
+  text(f, 16, `SALVAGE ${s.salvageRecovered}/${s.salvageDrops}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 252, PALC.W);
   const active = p.activeIndex === null ? '-' : p.activeIndex;
-  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 258, PALC.Y);
+  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 274, PALC.Y);
 }
 
 const TITLE_LINES = [
@@ -606,6 +616,7 @@ const HOWTO = [
   'Rover cannot cross craters: drop a bridge kit in, or press X.',
   'Rover refuels your jetpac. Aliens crashing make new craters!',
   'If the countdown ends, shoot down the missile chasing your rover.',
+  'Enemy salvage can refuel, boost fire or explode while you carry it.',
 ];
 function drawTitle(f, now, hiscore) {
   R(f, 'rgba(0,0,10,0.59)', 0, 0, HI_W, HI_H);
@@ -615,12 +626,12 @@ function drawTitle(f, now, hiscore) {
   let y = 240;
   for (const [k, v] of TITLE_LINES) { text(f, 22, k, 260, y, PALC.Y); text(f, 22, v, 560, y, PALC.W); y += 32; }
   y += 16;
-  for (const l of HOWTO) { text(f, 22, l, HI_W / 2, y, 'rgb(190,190,220)', true); y += 30; }
+  for (const l of HOWTO) { text(f, 22, l, HI_W / 2, y, 'rgb(190,190,220)', true); y += 26; }
   const loadout = LOADOUTS[S.loadoutIndex];
-  text(f, 22, `LOADOUT ${S.loadoutIndex + 1}/4: ${loadout.name} — ${loadout.detail}`, HI_W / 2, 610, PALC.Y, true);
+  text(f, 22, `LOADOUT ${S.loadoutIndex + 1}/4: ${loadout.name} — ${loadout.detail}`, HI_W / 2, 620, PALC.Y, true);
   text(f, 20, `LEFT/RIGHT OR 1-4 SELECT  •  UP/DOWN OR T: ${S.classic ? 'CLASSIC — THREE LIVES, FASTER WAVES, NO KIT RESCUE' : 'ARCADE — FOUR LIVES, DEPOT KIT RESCUE'}`,
-    HI_W / 2, 642, S.classic ? PALC.R : PALC.G, true);
-  if (trunc(now * 2) % 2) text(f, 30, touchMode ? 'TAP FIRE TO START' : 'PRESS FIRE TO START', HI_W / 2, 680, PALC.G, true);
+    HI_W / 2, 650, S.classic ? PALC.R : PALC.G, true);
+  if (trunc(now * 2) % 2) text(f, 30, touchMode ? 'TAP FIRE TO START' : 'PRESS FIRE TO START', HI_W / 2, 688, PALC.G, true);
   text(f, 22, 'HI-SCORE ' + pad(hiscore, 6), HI_W / 2, 735, PALC.C, true);
   text(f, 16, `VERSION ${VERSION}  -  ART & SOUND CREDITS: SEE CREDITS`, HI_W / 2, 770, 'rgb(120,120,150)', true, false);
 }

@@ -14,7 +14,7 @@
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.8.0-dev.1';
+const VERSION = '4.8.0-dev.2';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;
@@ -65,6 +65,10 @@ const DIVER_LOCK_RANGE = 50;
 const LOW_FUEL_LEVEL = 15;
 const LOW_FUEL_RESET = 25;
 const LOW_FUEL_REPEAT = 6;
+const SALVAGE_DROP_CHANCE = 0.24;
+const SALVAGE_KINDS = Object.freeze(['fuelcell', 'ammo', 'unstable']);
+const UNSTABLE_FUSE = 9;
+const RAPID_FIRE_TIME = 10;
 ALIEN_SCORE.ufo = 250; ALIEN_SPEED.ufo = 45;
 const MISSION_TYPES = Object.freeze([
   Object.freeze({ id: 'bomb', name: 'BOMB RUN', briefing: 'DELIVER THE BOMB TO THE MISSILE SITE' }),
@@ -157,7 +161,7 @@ class Terrain {
 class Player {
   constructor(x, y) {
     Object.assign(this, { x, y, vx: 0, vy: 0, face: 1, fuel: 100, onGround: true, inRover: false,
-      carry: null, dead: false, deadT: 0, invuln: 0, walk: 0, thrust: false, cool: 0 });
+      carry: null, dead: false, deadT: 0, invuln: 0, walk: 0, thrust: false, cool: 0, rapidT: 0 });
   }
 }
 class Rover {
@@ -167,13 +171,17 @@ class Rover {
   trailerX() { return wrap(this.x - this.dir * 25); }
 }
 class Item {
-  constructor(kind, x, y) { Object.assign(this, { kind, x: wrap(x), y, vx: 0, vy: 0, state: 'fall' }); }
+  constructor(kind, x, y) {
+    Object.assign(this, { kind, x: wrap(x), y, vx: 0, vy: 0, state: 'fall',
+      unstableT: kind === 'unstable' ? UNSTABLE_FUSE : 0, heldBy: null });
+  }
 }
 class Alien {
   constructor(kind, x, y, d, spd) {
     const hp = ALIEN_HP[kind] || 1;
     Object.assign(this, { kind, x, y, baseY: y, dir: d, vx: d * spd, vy: 0, t: uni(0, 6), ph: uni(0, 6), spd,
-      diving: false, diveWarnT: 0, diveTargetX: null, hp, hpMax: hp, hitT: 0 });
+      diving: false, diveWarnT: 0, diveTargetX: null, hp, hpMax: hp, hitT: 0,
+      cargo: null, stealing: false, guardT: 0 });
   }
 }
 class Laser {
@@ -225,7 +233,8 @@ class Game {
     this.gameCueT = 0;
     // Local session figures for balancing. They never leave the page or survive a reload.
     this.stats = { diverTelegraphs: 0, diverLaunches: 0, diverPlayerHits: 0, diverCrashes: 0,
-      roverBlockEvents: 0, roverBridgesLaid: 0, levelTransitions: 0 };
+      roverBlockEvents: 0, roverBridgesLaid: 0, levelTransitions: 0, diverHerds: 0,
+      chaserGuards: 0, cargoThefts: 0, salvageDrops: 0, salvageRecovered: 0 };
     this.nextBaseT = 0; this.kitT = 12; this.spawnT = 4;
     this.cam = this.p.x;
     this.msg = ''; this.msgT = 0; this.shake = 0; this.redFlash = 0;
@@ -389,6 +398,7 @@ class Game {
 
   updatePlayer(dt, inp) {
     const p = this.p, r = this.rover, t = this.terr;
+    p.rapidT = Math.max(0, p.rapidT - dt);
     if (p.dead) {
       p.thrust = false;
       p.deadT -= dt;
@@ -448,7 +458,7 @@ class Game {
     }
     if (inp.fire && p.cool <= 0) {
       this.lasers.push(new Laser(wrap(p.x + p.face * 6), p.y - 7, p.face));
-      p.cool = 0.17;
+      p.cool = p.rapidT > 0 ? 0.09 : 0.17;
       this.sfx.play('laser');
     }
     if (inp.pick_p) { if (p.carry) this.dropItem(); else this.tryPick(); }
@@ -488,6 +498,7 @@ class Game {
     if (p.carry) {
       const it = p.carry; p.carry = null;
       if (it.kind === 'bridge' && r.bridges < 4) { r.bridges++; removeItem(this.items, it); }
+      else if (it.kind === 'unstable') this.secureUnstable(it);
       else if (it.kind !== 'bridge' && this.stowCargo(it)) { /* safely stowed */ }
       else { it.state = 'fall'; it.x = wrap(r.x + r.dir * 20); }
     }
@@ -512,7 +523,8 @@ class Game {
     if (!best && this.cargoCount() && Math.abs(wdx(p.x, r.trailerX())) < 13 && Math.abs(p.y - this.trailerTop()) < 18) {
       best = r.cargo2 || r.cargo; this.removeCargo(best);
     }
-    if (best) { best.state = 'held'; p.carry = best; this.sfx.play('pick'); }
+    if (best && (best.kind === 'fuelcell' || best.kind === 'ammo')) this.collectSalvage(best);
+    else if (best) { best.state = 'held'; p.carry = best; this.sfx.play('pick'); }
   }
 
   // Drops just ahead of you, so you can stand on a crater lip and lob a kit straight in.
@@ -586,11 +598,66 @@ class Game {
     }
   }
 
+  spawnSalvage(kind, x, y) {
+    if (!SALVAGE_KINDS.includes(kind)) return null;
+    const it = new Item(kind, x, y);
+    it.vx = this.rng.uniform(-12, 12); it.vy = -this.rng.uniform(18, 32);
+    this.items.push(it); this.stats.salvageDrops++;
+    return it;
+  }
+
+  maybeDropSalvage(a) {
+    if (this.rng.random() >= SALVAGE_DROP_CHANCE) return null;
+    return this.spawnSalvage(this.rng.choice(SALVAGE_KINDS), a.x, a.y);
+  }
+
+  collectSalvage(it) {
+    if (!it || !this.items.includes(it)) return false;
+    if (it.kind === 'fuelcell') {
+      this.p.fuel = Math.min(this.fuelCapacity, this.p.fuel + 30);
+      this.flash('FUEL CELL RECOVERED', 1.5);
+    } else if (it.kind === 'ammo') {
+      this.p.rapidT = Math.max(this.p.rapidT, RAPID_FIRE_TIME);
+      this.flash('LASER CELLS: RAPID FIRE', 1.5);
+    } else return false;
+    removeItem(this.items, it); this.stats.salvageRecovered++;
+    this.addScore(100); this.sfx.play('pick');
+    return true;
+  }
+
+  secureUnstable(it) {
+    if (!it || !this.items.includes(it)) return false;
+    if (it.heldBy) { it.heldBy.cargo = null; it.heldBy = null; }
+    if (this.p.carry === it) this.p.carry = null;
+    this.removeCargo(it); removeItem(this.items, it);
+    this.stats.salvageRecovered++; this.addScore(1000);
+    this.sfx.play('extra'); this.flash('UNSTABLE TECH SECURED!  BONUS 1000', 2);
+    return true;
+  }
+
+  detonateUnstable(it) {
+    if (!it || !this.items.includes(it)) return false;
+    if (it.heldBy) { it.heldBy.cargo = null; it.heldBy = null; }
+    if (this.p.carry === it) this.p.carry = null;
+    this.removeCargo(it); removeItem(this.items, it);
+    this.explode(it.x, it.y, 34, 'MWCY', 75, 1, 45, 'big');
+    this.sfx.play('bigboom'); this.flash('UNSTABLE TECH DETONATED', 1.8);
+    if (!this.p.dead && this.p.invuln <= 0 && Math.abs(wdx(it.x, this.p.x)) < 36 && Math.abs(it.y - this.p.y) < 32)
+      this.killPlayer();
+    this.addCrater(it.x, 9);
+    return true;
+  }
+
   updateItems(dt) {
     const p = this.p, r = this.rover, t = this.terr;
     let nKits = 0;
     for (const it of [...this.items]) {
       if (it.kind === 'bridge') nKits++;
+      if (it.kind === 'unstable') {
+        it.unstableT = Math.max(0, it.unstableT - dt);
+        if (it.unstableT === 0) { this.detonateUnstable(it); continue; }
+      }
+      if (it.state === 'stolen') continue;
       if (it.state === 'held') { it.x = wrap(p.x + p.face * 7); it.y = p.y - 1; continue; }
       if (it.state === 'trailer') {
         it.x = wrap(r.trailerX() + (it === r.cargo2 ? r.dir * 7 : 0));
@@ -624,6 +691,10 @@ class Game {
       if (Math.abs(wdx(it.x, tx)) < 10 && ty - 3 <= it.y && it.y <= ty + 8 && it.vy >= 0) {
         if (it.kind === 'repair' && this.mission.id === 'repair') {
           this.installRepair(it);
+          continue;
+        }
+        if (it.kind === 'unstable') {
+          this.secureUnstable(it);
           continue;
         }
         if (it.kind === 'bridge' && r.bridges < 4) {
@@ -680,6 +751,62 @@ class Game {
     return true;
   }
 
+  diverAim(a) {
+    const targetX = (this.p.inRover || this.p.dead) ? this.rover.x : this.p.x;
+    let heavy = null, best = 220;
+    for (const other of this.aliens) {
+      if (other === a || other.kind !== 'heavy') continue;
+      const d = Math.abs(wdx(other.x, targetX));
+      if (d < best) { best = d; heavy = other; }
+    }
+    if (!heavy) return { x: wrap(this.rover.x + this.rover.dir * DIVER_AIM_LEAD), herded: false };
+    // Threaten the clear side, leaving the heavy's side as the tempting escape.
+    const heavySide = Math.sign(wdx(heavy.x, targetX)) || 1;
+    return { x: wrap(targetX - heavySide * 34), herded: true };
+  }
+
+  chaserTarget(a) {
+    const p = this.p, r = this.rover;
+    const tx = (p.inRover || p.dead) ? r.x : p.x;
+    const ty = (p.inRover || p.dead) ? this.roverY() - 14 : p.y - 7;
+    if (!this.base.alive || !this.mission || this.mission.id !== 'bomb') return { x: tx, y: ty, guarding: false };
+    const fromSite = wdx(tx, this.base.x);
+    if (Math.abs(fromSite) < 210) return { x: tx, y: ty, guarding: false };
+    const x = wrap(this.base.x + clamp(fromSite, -82, 82));
+    return { x, y: Math.min(92, this.terr.surface(x) - 28), guarding: true };
+  }
+
+  ufoCargoTarget(a) {
+    let best = null, bd = 190;
+    for (const it of this.items) {
+      if (!['bomb', 'supply', 'repair', ...SALVAGE_KINDS].includes(it.kind)) continue;
+      if (it.state !== 'ground' && it.state !== 'fall') continue;
+      const d = Math.hypot(wdx(it.x, a.x), it.y - a.y);
+      if (d < bd) { bd = d; best = it; }
+    }
+    return best;
+  }
+
+  stealCargo(a, it) {
+    if (!a || !it || a.cargo || !this.items.includes(it)) return false;
+    a.cargo = it; a.stealing = true;
+    it.state = 'stolen'; it.heldBy = a; it.vx = it.vy = 0;
+    this.stats.cargoThefts++; this.playGameplayCue('warning', 0.4);
+    this.flash('UFO HAS THE CARGO', 1.5);
+    return true;
+  }
+
+  releaseAlienCargo(a, relocated = false) {
+    if (!a || !a.cargo) return null;
+    const it = a.cargo; a.cargo = null; a.stealing = false;
+    it.heldBy = null; it.state = 'fall'; it.vx = 0; it.vy = 0;
+    if (relocated) {
+      it.x = this.missionSite(450, 750); it.y = GROUND - 70;
+      this.flash('UFO RELOCATED THE CARGO', 2);
+    } else { it.x = a.x; it.y = a.y + 6; }
+    return it;
+  }
+
   updateAliens(dt) {
     const p = this.p, r = this.rover, t = this.terr;
     this.spawnT -= dt;
@@ -695,14 +822,16 @@ class Game {
     for (const a of [...this.aliens]) {
       a.t += dt;
       a.hitT = Math.max(0, a.hitT - dt);
+      a.guardT = Math.max(0, a.guardT - dt);
       const k = a.kind;
       if (k === 'drifter' || k === 'heavy') {
         a.x = wrap(a.x + a.dir * a.spd * dt);
         a.baseY += 5 * dt;
         a.y = a.baseY + Math.sin(a.t * 2.5 + a.ph) * 12;
       } else if (k === 'chaser') {
-        let tx, ty;
-        if (p.inRover || p.dead) { tx = r.x; ty = this.roverY() - 14; } else { tx = p.x; ty = p.y - 7; }
+        const target = this.chaserTarget(a), tx = target.x, ty = target.y;
+        if (target.guarding && a.guardT <= 0) this.stats.chaserGuards++;
+        a.guardT = target.guarding ? 0.5 : 0;
         const dx = wdx(tx, a.x), dy = ty - a.y, n = Math.hypot(dx, dy) || 1;
         a.vx += (dx / n * a.spd - a.vx) * 1.5 * dt;
         a.vy += (dy / n * a.spd - a.vy) * 1.5 * dt;
@@ -715,11 +844,24 @@ class Game {
         const gy = t.surface(a.x) - 4;
         if (a.y >= gy) { a.y = gy; a.vy = -uni(85, 115); }
       } else if (k === 'ufo') {
-        // Sidles over, then swoops. Never lands, so no craters from these.
-        const tx = (p.inRover || p.dead) ? r.x : p.x;
-        a.vx += (clamp(wdx(tx, a.x), -1, 1) * a.spd - a.vx) * 0.8 * dt;
-        a.x = wrap(a.x + a.vx * dt);
-        a.y = clamp(a.baseY + Math.sin(a.t * 2.2 + a.ph) * 30, CEILING, t.surface(a.x) - 24);
+        // Cargo raiders are greedy rather than psychic: they only notice loose items nearby.
+        if (a.cargo) {
+          a.x = wrap(a.x + a.dir * a.spd * 0.45 * dt); a.y -= 32 * dt;
+          a.cargo.x = a.x; a.cargo.y = a.y + 7;
+          if (a.y <= CEILING + 1) {
+            this.releaseAlienCargo(a, true); removeItem(this.aliens, a); continue;
+          }
+        } else {
+          const cargo = this.ufoCargoTarget(a);
+          const tx = cargo ? cargo.x : ((p.inRover || p.dead) ? r.x : p.x);
+          const ty = cargo ? cargo.y - 10 : a.baseY + Math.sin(a.t * 2.2 + a.ph) * 30;
+          const dx = wdx(tx, a.x), dy = ty - a.y, n = Math.hypot(dx, dy) || 1;
+          a.vx += (dx / n * a.spd - a.vx) * 0.9 * dt;
+          a.vy += (dy / n * a.spd - a.vy) * 0.9 * dt;
+          a.x = wrap(a.x + a.vx * dt);
+          a.y = clamp(a.y + a.vy * dt, CEILING, t.surface(a.x) - 18);
+          if (cargo && Math.abs(wdx(cargo.x, a.x)) < 9 && Math.abs(cargo.y - a.y) < 13) this.stealCargo(a, cargo);
+        }
       } else if (k === 'diver') {
         if (!a.diving) {
           if (a.diveWarnT > 0) {
@@ -737,10 +879,11 @@ class Game {
           } else {
             a.x = wrap(a.x + a.dir * a.spd * dt);
             a.y = a.baseY + Math.sin(a.t * 4) * 4;
-            // Aims just ahead of the rover. Spiteful, but now at least announced.
-            const aim = wrap(r.x + r.dir * DIVER_AIM_LEAD);
-            if (Math.abs(wdx(aim, a.x)) < DIVER_LOCK_RANGE) {
-              a.diveWarnT = DIVER_WARNING; a.diveTargetX = aim;
+            // A lone diver leads the target; one with a heavy nearby attacks the clear side.
+            const aim = this.diverAim(a);
+            if (Math.abs(wdx(aim.x, a.x)) < DIVER_LOCK_RANGE) {
+              a.diveWarnT = DIVER_WARNING; a.diveTargetX = aim.x;
+              if (aim.herded) this.stats.diverHerds++;
               this.stats.diverTelegraphs++;
               this.playGameplayCue('divewarn');
             }
@@ -763,10 +906,12 @@ class Game {
         }
         continue;
       }
-      if (Math.abs(wdx(a.x, this.cam)) > W * 1.6) { removeItem(this.aliens, a); continue; }
+      if (Math.abs(wdx(a.x, this.cam)) > W * 1.6) {
+        this.releaseAlienCargo(a); removeItem(this.aliens, a); continue;
+      }
       if (!p.dead && !p.inRover && p.invuln <= 0 &&
           Math.abs(wdx(a.x, p.x)) < 8 && Math.abs(a.y - (p.y - 7)) < 9) {
-        removeItem(this.aliens, a);
+        this.releaseAlienCargo(a); removeItem(this.aliens, a);
         if (k === 'diver') this.stats.diverPlayerHits++;
         this.killPlayer();
       }
@@ -792,8 +937,10 @@ class Game {
       this.sfx.play(a.kind === 'heavy' ? 'heavyhit' : 'hit');
       return false;
     }
+    this.releaseAlienCargo(a);
     removeItem(this.aliens, a);
     this.addScore(ALIEN_SCORE[a.kind]);
+    this.maybeDropSalvage(a);
     this.explode(a.x, a.y, 18, a.kind !== 'drifter' ? 'YOWR' : 'GYW', 50, 0.8, 40, 'small');
     this.sfx.play('boom');
     return true;
@@ -961,5 +1108,6 @@ if (typeof module !== 'undefined') {
   module.exports = { VERSION, BOOM_FRAMES, PAL, PALC, ALIEN_SCORE, ALIEN_HIT_FLASH, LEVEL_PROFILES, levelProfile,
     MISSION_TYPES, missionForLevel, LOADOUTS, loadoutById,
     DIVER_WARNING, DIVER_AIM_LEAD, DIVER_LOCK_RANGE, LOW_FUEL_LEVEL,
-    LOW_FUEL_RESET, LOW_FUEL_REPEAT, Game, Alien, Laser, Missile, Item, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
+    LOW_FUEL_RESET, LOW_FUEL_REPEAT, SALVAGE_DROP_CHANCE, SALVAGE_KINDS, UNSTABLE_FUSE, RAPID_FIRE_TIME,
+    Game, Alien, Laser, Missile, Item, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
 }
