@@ -14,7 +14,7 @@
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.8.0-dev.2';
+const VERSION = '4.8.0-dev.3';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;
@@ -69,6 +69,19 @@ const SALVAGE_DROP_CHANCE = 0.24;
 const SALVAGE_KINDS = Object.freeze(['fuelcell', 'ammo', 'unstable']);
 const UNSTABLE_FUSE = 9;
 const RAPID_FIRE_TIME = 10;
+const LEVEL_EVENTS = Object.freeze([
+  Object.freeze({ id: 'solar', name: 'SOLAR INTERFERENCE', duration: 12 }),
+  Object.freeze({ id: 'telefail', name: 'TELEPORTER OUTAGE', duration: 14 }),
+  Object.freeze({ id: 'meteor', name: 'METEOR FRONT', duration: 12 }),
+  Object.freeze({ id: 'lowgrav', name: 'LOW-GRAVITY SURGE', duration: 14 }),
+]);
+function eventForLevel(level) { return LEVEL_EVENTS[mod(Math.max(1, trunc(level || 1)) - 1, LEVEL_EVENTS.length)]; }
+const SECONDARY_OBJECTIVES = Object.freeze([
+  Object.freeze({ id: 'hunter', name: 'CLEAR THE SKY', target: 4, unit: 'ALIENS' }),
+  Object.freeze({ id: 'salvage', name: 'FIELD RECOVERY', target: 1, unit: 'SALVAGE' }),
+  Object.freeze({ id: 'quick', name: 'BEAT THE CLOCK', target: 30, unit: 'SECONDS LEFT' }),
+]);
+function secondaryForLevel(level) { return SECONDARY_OBJECTIVES[mod(Math.max(1, trunc(level || 1)) - 1, SECONDARY_OBJECTIVES.length)]; }
 ALIEN_SCORE.ufo = 250; ALIEN_SPEED.ufo = 45;
 const MISSION_TYPES = Object.freeze([
   Object.freeze({ id: 'bomb', name: 'BOMB RUN', briefing: 'DELIVER THE BOMB TO THE MISSILE SITE' }),
@@ -220,7 +233,7 @@ class Game {
     this.rover = new Rover(HOME_X + 72);
     this.p = new Player(HOME_X - 30, this.terr.base(HOME_X - 30));
     this.items = []; this.aliens = []; this.lasers = []; this.shells = []; this.missiles = [];
-    this.parts = []; this.rings = []; this.booms = [];
+    this.parts = []; this.rings = []; this.booms = []; this.meteorWarnings = [];
     this.base = new Base(0);
     this.placeBase();
     for (let i = 0; i < 40 && this.terr.craters.length < 8; i++)
@@ -234,7 +247,9 @@ class Game {
     // Local session figures for balancing. They never leave the page or survive a reload.
     this.stats = { diverTelegraphs: 0, diverLaunches: 0, diverPlayerHits: 0, diverCrashes: 0,
       roverBlockEvents: 0, roverBridgesLaid: 0, levelTransitions: 0, diverHerds: 0,
-      chaserGuards: 0, cargoThefts: 0, salvageDrops: 0, salvageRecovered: 0 };
+      chaserGuards: 0, cargoThefts: 0, salvageDrops: 0, salvageRecovered: 0,
+      eventsStarted: 0, meteorImpacts: 0, secondaryCompleted: 0 };
+    this.startLevelProgression();
     this.nextBaseT = 0; this.kitT = 12; this.spawnT = 4;
     this.cam = this.p.x;
     this.msg = ''; this.msgT = 0; this.shake = 0; this.redFlash = 0;
@@ -306,7 +321,9 @@ class Game {
   }
   missionBrief() {
     const mode = this.classic ? 'CLASSIC' : 'ARCADE';
-    return `LEVEL ${this.level}: ${this.mission.name} - ${this.mission.briefing} [${mode}]`;
+    const event = this.levelEvent ? ` / ${this.levelEvent.name}` : '';
+    const optional = this.secondary ? ` / OPTIONAL: ${this.secondary.name}` : '';
+    return `LEVEL ${this.level}: ${this.mission.name} - ${this.mission.briefing} [${mode}]${event}${optional}`;
   }
   missionTargetX() {
     if (this.mission.id === 'bomb') return this.base.x;
@@ -320,6 +337,104 @@ class Game {
     // does not become an accidental chord.
     if (this.gameCueT > 0 || (this.base.alive && this.timer <= 10)) return false;
     this.sfx.play(name); this.gameCueT = cooldown; return true;
+  }
+
+  startLevelProgression() {
+    const event = eventForLevel(this.level), secondary = secondaryForLevel(this.level);
+    this.levelEvent = { ...event, active: false, t: 0, next: 10, pulseT: 0 };
+    this.secondary = { ...secondary, progress: 0, completed: false, failed: false,
+      bonus: 500 * Math.max(1, this.level) };
+    this.meteorWarnings.length = 0;
+  }
+
+  levelEventActive(id) { return !!(this.levelEvent && this.levelEvent.active && this.levelEvent.id === id); }
+  gravityScale() { return this.levelEventActive('lowgrav') ? 0.55 : 1; }
+
+  startLevelEvent(id = null) {
+    const event = id ? LEVEL_EVENTS.find(x => x.id === id) : eventForLevel(this.level);
+    if (!event) return false;
+    this.levelEvent = { ...event, active: true, t: event.duration, next: 0, pulseT: 0.35 };
+    this.stats.eventsStarted++;
+    this.playGameplayCue('warning', 0.5);
+    this.flash(event.name, 2);
+    return true;
+  }
+
+  updateLevelEvent(dt) {
+    const event = this.levelEvent;
+    if (!event) return;
+    if (!event.active) {
+      event.next -= dt;
+      if (event.next <= 0) this.startLevelEvent(event.id);
+      return;
+    }
+    event.t = Math.max(0, event.t - dt);
+    if (event.id === 'meteor') {
+      event.pulseT -= dt;
+      if (event.pulseT <= 0) { this.scheduleMeteor(); event.pulseT = 2.4; }
+    }
+    if (event.t === 0) {
+      event.active = false; event.next = 28;
+      this.flash(`${event.name} CLEARED`, 1.5);
+    }
+  }
+
+  scheduleMeteor(atX = null) {
+    let x = atX === null ? wrap(this.cam + this.rng.uniform(-135, 135)) : wrap(atX);
+    if (atX === null) {
+      for (let tries = 0; tries < 20; tries++) {
+        const clear = Math.abs(wdx(x, HOME_X)) > 55 && Math.abs(wdx(x, this.rover.x)) > 36
+          && (!this.base.alive || Math.abs(wdx(x, this.base.x)) > 48);
+        if (clear) break;
+        x = wrap(this.cam + this.rng.uniform(-135, 135));
+      }
+    }
+    const warning = { x, t: 1.25 };
+    this.meteorWarnings.push(warning);
+    this.playGameplayCue('divewarn', 0.2);
+    return warning;
+  }
+
+  updateMeteors(dt) {
+    for (const meteor of [...this.meteorWarnings]) {
+      meteor.t -= dt;
+      if (meteor.t > 0) continue;
+      removeItem(this.meteorWarnings, meteor);
+      const y = this.terr.surface(meteor.x);
+      this.explode(meteor.x, y, 28, 'YORW', 70, 0.9, 45, 'ground');
+      this.sfx.play('boom'); this.stats.meteorImpacts++;
+      if (this.addCrater(meteor.x, this.rng.randint(7, 10)))
+        for (const it of this.items) if (it.state === 'ground') it.state = 'fall';
+      if (!this.p.dead && !this.p.inRover && this.p.invuln <= 0
+          && Math.abs(wdx(meteor.x, this.p.x)) < 13 && Math.abs(y - this.p.y) < 28) this.killPlayer();
+    }
+  }
+
+  progressSecondary(id, amount = 1) {
+    const secondary = this.secondary;
+    if (!secondary || secondary.completed || secondary.failed || secondary.id !== id) return false;
+    secondary.progress = Math.min(secondary.target, secondary.progress + amount);
+    if (secondary.progress >= secondary.target) return this.completeSecondary();
+    return false;
+  }
+
+  completeSecondary() {
+    const secondary = this.secondary;
+    if (!secondary || secondary.completed || secondary.failed) return false;
+    secondary.completed = true; secondary.progress = secondary.target;
+    this.stats.secondaryCompleted++; this.addScore(secondary.bonus);
+    this.sfx.play('extra'); this.flash(`OPTIONAL COMPLETE!  BONUS ${secondary.bonus}`, 2);
+    return true;
+  }
+
+  finishSecondary() {
+    const secondary = this.secondary;
+    if (!secondary || secondary.completed || secondary.failed) return 0;
+    if (secondary.id === 'quick' && this.timer >= secondary.target) {
+      const before = this.score; this.completeSecondary(); return this.score - before;
+    }
+    secondary.failed = true;
+    return 0;
   }
   addScore(n) {
     this.score += n;
@@ -376,6 +491,8 @@ class Game {
     this.gameCueT = Math.max(0, this.gameCueT - dt);
     this.shake = Math.max(0, this.shake - dt);
     this.redFlash = Math.max(0, this.redFlash - dt);
+    this.updateLevelEvent(dt);
+    this.updateMeteors(dt);
     this.updatePlayer(dt, inp);
     if (this.over) return;
     this.updateWarnings(dt);
@@ -450,7 +567,7 @@ class Game {
       if (sy - p.y > 3) p.onGround = false; else p.y = sy;
     }
     if (!p.onGround) {
-      p.vy += (heavy ? 150 : 120) * dt;
+      p.vy += (heavy ? 150 : 120) * this.gravityScale() * dt;
       p.vy = clamp(p.vy, -75, 115);
       p.y += p.vy * dt;
       if (p.y < CEILING) { p.y = CEILING; p.vy = Math.max(p.vy, 0); }
@@ -507,10 +624,14 @@ class Game {
 
   teleport(i) {
     const p = this.p;
+    if (this.levelEventActive('telefail')) {
+      this.playGameplayCue('blocked'); this.flash('TELEPORTERS OFFLINE', 1.5); return false;
+    }
     this.explode(p.x, p.y - 6, 20, 'CWB', 40, 0.6, 0);
     p.x = this.tele[1 - i]; p.y = this.terr.base(p.x); this.cam = p.x;
     this.explode(p.x, p.y - 6, 20, 'CWB', 40, 0.6, 0);
     this.sfx.play('teleport');
+    return true;
   }
 
   tryPick() {
@@ -622,6 +743,7 @@ class Game {
     } else return false;
     removeItem(this.items, it); this.stats.salvageRecovered++;
     this.addScore(100); this.sfx.play('pick');
+    this.progressSecondary('salvage');
     return true;
   }
 
@@ -631,6 +753,7 @@ class Game {
     if (this.p.carry === it) this.p.carry = null;
     this.removeCargo(it); removeItem(this.items, it);
     this.stats.salvageRecovered++; this.addScore(1000);
+    this.progressSecondary('salvage');
     this.sfx.play('extra'); this.flash('UNSTABLE TECH SECURED!  BONUS 1000', 2);
     return true;
   }
@@ -669,7 +792,7 @@ class Game {
         if (sy > it.y + 1) { it.state = 'fall'; it.vy = 0; }
         else { it.y = sy; continue; }
       }
-      it.vy = Math.min(160, it.vy + 170 * dt);
+      it.vy = Math.min(160, it.vy + 170 * this.gravityScale() * dt);
       it.x = wrap(it.x + it.vx * dt);
       it.vx *= Math.max(0, 1 - dt);
       it.y += it.vy * dt;
@@ -741,6 +864,7 @@ class Game {
 
   completeMission(message, bonus, cue = 'bigboom') {
     if (!this.mission || this.mission.completed) return false;
+    this.finishSecondary();
     this.mission.completed = true;
     this.base.alive = false;
     this.addScore(bonus);
@@ -838,7 +962,7 @@ class Game {
         a.x = wrap(a.x + a.vx * dt);
         a.y += a.vy * dt;
       } else if (k === 'bouncer') {
-        a.vy += 90 * dt;
+        a.vy += 90 * this.gravityScale() * dt;
         a.x = wrap(a.x + a.dir * a.spd * dt);
         a.y += a.vy * dt;
         const gy = t.surface(a.x) - 4;
@@ -940,6 +1064,7 @@ class Game {
     this.releaseAlienCargo(a);
     removeItem(this.aliens, a);
     this.addScore(ALIEN_SCORE[a.kind]);
+    this.progressSecondary('hunter');
     this.maybeDropSalvage(a);
     this.explode(a.x, a.y, 18, a.kind !== 'drifter' ? 'YOWR' : 'GYW', 50, 0.8, 40, 'small');
     this.sfx.play('boom');
@@ -1086,6 +1211,7 @@ class Game {
         this.placeBase();
         this.timer = this.levelTime();
         this.startMission();
+        this.startLevelProgression();
         this.sfx.play('levelup');
         this.flash(this.missionBrief(), 4);
       }
@@ -1109,5 +1235,6 @@ if (typeof module !== 'undefined') {
     MISSION_TYPES, missionForLevel, LOADOUTS, loadoutById,
     DIVER_WARNING, DIVER_AIM_LEAD, DIVER_LOCK_RANGE, LOW_FUEL_LEVEL,
     LOW_FUEL_RESET, LOW_FUEL_REPEAT, SALVAGE_DROP_CHANCE, SALVAGE_KINDS, UNSTABLE_FUSE, RAPID_FIRE_TIME,
+    LEVEL_EVENTS, eventForLevel, SECONDARY_OBJECTIVES, secondaryForLevel,
     Game, Alien, Laser, Missile, Item, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
 }

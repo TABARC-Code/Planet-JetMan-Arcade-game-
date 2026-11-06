@@ -3,7 +3,8 @@
 'use strict';
 const L = require('../web/game.js');
 const { Game, Alien, Missile, LEVEL_PROFILES, levelProfile, MISSION_TYPES, missionForLevel,
-  LOADOUTS, newInput, wrap, wdx } = L;
+  LOADOUTS, LEVEL_EVENTS, eventForLevel, SECONDARY_OBJECTIVES, secondaryForLevel,
+  newInput, wrap, wdx } = L;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exit(1); } };
 
 const G = (options = {}) => { const g = new Game(null, 5, options); g.spawnT = 1e9; return g; };
@@ -189,6 +190,51 @@ g.rng.random = () => 0; g.rng.choice = () => 'fuelcell';
 const donor = new Alien('drifter', wrap(g.p.x + 30), 70, 1, 0); g.aliens.push(donor); g.killAlien(donor);
 assert(g.items.some(it => it.kind === 'fuelcell') && g.stats.salvageDrops >= 4, 'enemy kills use the tested salvage drop gate');
 console.log('salvage ok');
+
+assert(LEVEL_EVENTS.length === 4 && eventForLevel(1).id === 'solar'
+  && eventForLevel(2).id === 'telefail' && eventForLevel(3).id === 'meteor'
+  && eventForLevel(4).id === 'lowgrav' && eventForLevel(5).id === 'solar',
+  'four level events rotate without randomising the briefing');
+assert(SECONDARY_OBJECTIVES.length === 3 && secondaryForLevel(1).id === 'hunter'
+  && secondaryForLevel(2).id === 'salvage' && secondaryForLevel(3).id === 'quick',
+  'three optional objectives rotate by level');
+
+g = G(); g.levelEvent.next = 0; g.updateLevelEvent(0.01);
+assert(g.levelEventActive('solar') && g.stats.eventsStarted === 1, 'scheduled solar event starts once');
+g = G(); const beforeTeleport = g.p.x; g.startLevelEvent('telefail');
+assert(!g.teleport(0) && g.p.x === beforeTeleport, 'teleporter outage blocks travel cleanly');
+g.updateLevelEvent(L.LEVEL_EVENTS.find(e => e.id === 'telefail').duration + 0.01);
+assert(!g.levelEventActive('telefail') && g.teleport(0), 'teleporters recover when the event clears');
+
+const normalGravity = G(), lowGravity = G();
+normalGravity.p.onGround = false; normalGravity.p.vy = 0; normalGravity.p.y = 80;
+lowGravity.p.onGround = false; lowGravity.p.vy = 0; lowGravity.p.y = 80; lowGravity.startLevelEvent('lowgrav');
+normalGravity.updatePlayer(0.25, newInput()); lowGravity.updatePlayer(0.25, newInput());
+assert(lowGravity.p.vy < normalGravity.p.vy, 'low-gravity surge changes player physics rather than merely the caption');
+
+g = G(); let meteorX = wrap(g.cam + 260);
+while (Math.abs(wdx(meteorX, L.HOME_X)) < 60 || Math.abs(wdx(meteorX, g.rover.x)) < 40
+    || Math.abs(wdx(meteorX, g.base.x)) < 55 || g.terr.craterAt(meteorX, 14)) meteorX = wrap(meteorX + 31);
+const craterCount = g.terr.craters.length, warning = g.scheduleMeteor(meteorX); warning.t = 0;
+g.updateMeteors(0.01);
+assert(g.stats.meteorImpacts === 1 && g.terr.craters.length === craterCount + 1,
+  'meteor warning resolves into one real crater');
+console.log('level events ok');
+
+g = G(); const hunterStart = g.score;
+g.progressSecondary('hunter'); g.progressSecondary('hunter'); g.progressSecondary('hunter'); g.progressSecondary('hunter');
+assert(g.secondary.completed && g.score === hunterStart + 500 && g.stats.secondaryCompleted === 1,
+  'clear-the-sky objective awards one level-scaled bonus');
+g = G(); g.level = 2; g.startLevelProgression();
+const fieldFuel = g.spawnSalvage('fuelcell', g.p.x, g.p.y); g.collectSalvage(fieldFuel);
+assert(g.secondary.completed && g.secondary.id === 'salvage', 'field recovery follows actual salvage collection');
+g = G(); g.level = 3; g.startMission(); g.startLevelProgression(); g.timer = 35;
+g.completeMission('TEST COMPLETE', 0);
+assert(g.secondary.completed && g.score === 1500, 'beat-the-clock objective resolves with the primary mission');
+g = G(); g.level = 3; g.startMission(); g.startLevelProgression(); g.timer = 20;
+g.completeMission('TEST COMPLETE', 0);
+assert(g.secondary.failed && !g.secondary.completed, 'missed optional objective does not block mission completion');
+console.log('secondary objectives ok');
 
 // sound is code now - make sure every recipe and the music render to something sane
 const { SFX_RECIPES, renderSfx } = require('../web/sfx.js');

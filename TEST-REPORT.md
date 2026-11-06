@@ -1,18 +1,28 @@
-# Test report — v4.8.0-dev.2
+# Test report — v4.8.0-dev.3
 
-Tested on 5 November 2026 from the development branch.
+Tested on 6 November 2026 from the development branch.
 
 ## Development milestone
 
-- Diver/heavy herding, chaser site defence and UFO cargo theft/recovery passed.
-- Fuel cells, rapid-fire laser cells, unstable delivery, fuse detonation and the
-  deterministic salvage-drop gate passed.
+- Solar interference, teleporter outages, meteor fronts and low-gravity surges
+  passed their deterministic rotation and recovery checks.
+- Teleporters rejected travel only while their outage was active. Meteor warnings
+  produced real craters, and the low-gravity event altered live physics rather
+  than merely putting an optimistic caption on the screen.
+- Alien-hunting, salvage-recovery and quick-finish secondary objectives passed,
+  including score awards and the rule that a missed optional objective cannot
+  block the primary mission.
+- Diver/heavy herding, chaser site defence, UFO cargo theft/recovery and the full
+  salvage loop passed again.
 - Mission rotation, all four loadouts, Classic mode and the complete earlier
   mechanics, controller, art and audio suites passed again.
-- The rebuilt 207 KB single-file browser completed a 12,000-frame soak:
-  `SELFTEST OK frames=12000 games=1 maxLevel=1 ms=12273 audio=suspended buffers=28 ambience=6 music=30.0s`.
-- The browser console contained no warnings or errors during that soak.
+- The rebuilt 214 KB single-file browser completed a 12,000-frame headless soak:
+  `SELFTEST OK frames=12000 games=1 maxLevel=1 ms=16472 audio=suspended buffers=28 ambience=6 music=30.0s`.
 - Project-facing wording contains no prohibited development-tool references.
+
+The development browser's interactive console could not be inspected during this
+run, so no console-clean claim is made for dev.3. Syntax, regression and self-test
+results remain recorded separately rather than being dressed up as the same thing.
 
 A physical-controller playthrough remains unverified. Hardware remains hardware,
 obstinately.

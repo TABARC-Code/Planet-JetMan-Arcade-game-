@@ -1,5 +1,21 @@
 # Programmer notes — browser 4.8.0 development
 
+For dev.3 I added four disruptions, but kept them legible. Solar static breaks the
+scanner rather than the controls. Teleporter outages turn both pads red. Meteors
+paint the ground before arriving, and low gravity changes the actual simulation —
+Jetman, loose equipment and bouncers — instead of merely adding a jaunty caption.
+
+The optional jobs are deliberately small: four aliens, one recovered salvage item,
+or thirty seconds left on the clock. They pay 500 points per level and never hold
+the main mission hostage. An optional objective which becomes compulsory has
+simply acquired a false moustache.
+
+The next pass is the mobile command vehicle encounter, followed by the full release
+regression and packaging work. That encounter needs proper phases and readable
+counterplay; a large health bar with wheels would be cheaper, but not better.
+
+## v4.8.0-dev.2 notes
+
 For dev.2 I stopped treating each alien as a private contractor. Divers now use a
 nearby heavy to close the comfortable escape lane, chasers screen the missile site,
 and UFOs collect loose cargo. A carrier which gets away relocates the item instead

@@ -317,6 +317,14 @@ function drawWorld(c, g, now) {
   drawDepot(c, g, now);
   for (const tp of g.tele) drawTeleporter(c, g, tp, now);
   drawBase(c, g, now);
+  for (const meteor of g.meteorWarnings) {
+    const sx = gsx(g, meteor.x), gy = g.terr.surface(meteor.x);
+    if (sx < -20 || sx > W + 20) continue;
+    const col = trunc(now * 12) % 2 ? PALC.R : PALC.Y;
+    line(c, col, sx - 5, gy - 2, sx + 5, gy - 2);
+    line(c, col, sx, gy - 7, sx, gy + 2);
+    line(c, PALC.O, sx + 12, CEILING, sx + 2, Math.max(CEILING, gy - 16), 2);
+  }
   for (const it of g.items) if (it.state === 'ground' || it.state === 'fall') drawItem(c, g, it, 1);
   drawRover(c, g, now);
   const p = g.p;
@@ -418,11 +426,12 @@ function drawTeleporter(c, g, x, now) {
   const sx = gsx(g, x);
   if (sx <= -20 || sx >= W + 20) return;
   const gy = g.terr.base(x);
-  R(c, PALC.b, sx - 9, gy - 2, 18, 3);
-  R(c, PALC.C, sx - 7, gy - 3, 14, 1);
+  const offline = g.levelEventActive && g.levelEventActive('telefail');
+  R(c, offline ? PALC.r : PALC.b, sx - 9, gy - 2, 18, 3);
+  R(c, offline ? PALC.R : PALC.C, sx - 7, gy - 3, 14, 1);
   for (let k = 0; k < 4; k++) {
     const yy = gy - 4 - trunc(mod(now * 25 + k * 7, 28));
-    const col = k % 2 ? PALC.C : PALC.c;
+    const col = offline ? (k % 2 ? PALC.R : PALC.r) : (k % 2 ? PALC.C : PALC.c);
     P(c, col, sx - 6, yy); P(c, col, sx + 6, yy); P(c, PALC.W, sx, yy - 3);
   }
 }
@@ -579,7 +588,23 @@ function drawHud(f, g, now, hiscore) {
   if (!g.p.inRover) R(f, PALC.C, px(g.p.x) - 1, sy0 + 1, 3, 8);
   if (g.mission && !g.mission.completed) {
     const d = wdx(g.missionTargetX(), g.cam);
-    if (Math.abs(d) > W / 2) text(f, 22, d > 0 ? 'OBJECTIVE >>' : '<< OBJECTIVE', d > 0 ? HI_W - 210 : 20, 90, PALC.Y);
+    if (Math.abs(d) > W / 2) text(f, 22, d > 0 ? 'OBJECTIVE >>' : '<< OBJECTIVE', d > 0 ? HI_W - 210 : 20, 134, PALC.Y);
+  }
+  if (g.levelEvent) {
+    const eventState = g.levelEvent.active ? `${g.levelEvent.name} ${Math.ceil(g.levelEvent.t)}` : `${g.levelEvent.name} IN ${Math.ceil(g.levelEvent.next)}`;
+    text(f, 18, eventState, 20, 90, g.levelEvent.active ? PALC.R : PALC.w);
+    if (g.levelEventActive('solar') && trunc(now * 10) % 3 === 0) {
+      for (let x = sx0 + 2; x < sx0 + sw - 2; x += 18) R(f, 'rgba(5,5,15,.9)', x, sy0 + 1, 10, sh - 2);
+    }
+  }
+  if (g.secondary) {
+    let status;
+    if (g.secondary.completed) status = 'COMPLETE';
+    else if (g.secondary.failed) status = 'MISSED';
+    else if (g.secondary.id === 'quick') status = `KEEP ${g.secondary.target}S`;
+    else status = `${g.secondary.progress}/${g.secondary.target}`;
+    text(f, 18, `OPTIONAL ${g.secondary.name}: ${status}`, 20, 112,
+      g.secondary.completed ? PALC.G : (g.secondary.failed ? PALC.r : PALC.C));
   }
   if (r.blocked && g.p.inRover) {
     const instruction = r.bridges ? 'CRATER AHEAD — PRESS X TO LAY A BRIDGE' : 'CRATER AHEAD — NO BRIDGES';
@@ -591,15 +616,16 @@ function drawHud(f, g, now, hiscore) {
 
 function drawTelemetry(f, g) {
   const s = g.stats, p = S.pad;
-  R(f, 'rgba(5,8,20,.88)', 18, 128, 360, 170);
-  strokeR(f, PALC.C, 18, 128, 360, 170);
+  R(f, 'rgba(5,8,20,.88)', 18, 128, 390, 194);
+  strokeR(f, PALC.C, 18, 128, 390, 194);
   text(f, 18, 'FIELD TELEMETRY — F2 CLOSES', 34, 140, PALC.C);
   text(f, 16, `DIVER WARN ${s.diverTelegraphs}  LAUNCH ${s.diverLaunches}  CRASH ${s.diverCrashes}`, 34, 174, PALC.W);
   text(f, 16, `DIVER HITS ${s.diverPlayerHits}  ROVER BLOCKS ${s.roverBlockEvents}`, 34, 202, PALC.W);
   text(f, 16, `HERDS ${s.diverHerds}  GUARDS ${s.chaserGuards}  THEFTS ${s.cargoThefts}`, 34, 230, PALC.W);
-  text(f, 16, `SALVAGE ${s.salvageRecovered}/${s.salvageDrops}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 252, PALC.W);
+  text(f, 16, `EVENTS ${s.eventsStarted}  METEORS ${s.meteorImpacts}  OPTIONAL ${s.secondaryCompleted}`, 34, 252, PALC.W);
+  text(f, 16, `SALVAGE ${s.salvageRecovered}/${s.salvageDrops}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 274, PALC.W);
   const active = p.activeIndex === null ? '-' : p.activeIndex;
-  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 274, PALC.Y);
+  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 296, PALC.Y);
 }
 
 const TITLE_LINES = [

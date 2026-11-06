@@ -1,5 +1,29 @@
 # Change log
 
+## v4.8.0-dev.3 — 6 November 2026
+
+This milestone adds predictable lunar disruptions and optional objectives. Events
+change the playfield without quietly changing the rules underneath the player.
+
+### Added
+
+- Four rotating level events: solar interference disrupts the scanner, teleporter
+  outages disable both pads, meteor fronts mark impacts before cutting new craters,
+  and low-gravity surges alter Jetman, loose-item and bouncer physics.
+- Three rotating optional objectives: destroy four aliens, recover one salvage
+  item, or complete the primary mission with at least 30 seconds remaining.
+- Level-scaled 500-point optional bonuses, clear completion/missed states and
+  short briefing, HUD and telemetry feedback.
+- Red outage art for teleporter pads, pulsing meteor impact markers and solar
+  static drawn with the existing JavaScript renderer.
+- Regression coverage for event rotation and recovery, real low-gravity physics,
+  meteor craters, all optional-objective paths and missed objectives.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.3`; it is not the final release.
+- A major encounter, full release regression and final packaging remain later work.
+
 ## v4.8.0-dev.2 — 5 November 2026
 
 This milestone gives existing enemies jobs to do together and adds salvage which
