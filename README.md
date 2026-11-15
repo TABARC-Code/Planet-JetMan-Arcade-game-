@@ -1,7 +1,7 @@
 # Lunar Jetman — 4.8.0 development branch
 
-This branch contains the tested `4.8.0-dev.3` level-event and progression
-milestone, building on the mission, loadout, enemy-combination and salvage work.
+This branch contains the tested `4.8.0-dev.4` command-vehicle encounter,
+building on the mission, loadout, enemy-combination, salvage and level-event work.
 It is playable, but it is not the final 4.8.0 release package.
 
 Open `index.html` in a modern desktop browser. It is the complete game: artwork,
@@ -57,6 +57,12 @@ outage, a meteor front or a low-gravity surge. Events are announced, temporary a
 repeat on a fixed rotation. An optional objective sits beside the main job and pays
 500 points per current level for combat, salvage recovery or a fast finish. Missing
 it never blocks the primary mission.
+
+From level four, later bomb runs add a mobile command vehicle around the missile
+site. Its shield rejects ordinary fire. The vehicle marks a ground strike, fires,
+then exposes its core briefly; one clean hit forces it to recover and four openings
+destroy it. At half strength its damaged phase cycles faster, while the warning
+remains explicit. Bombs bounce clear of the protected site instead of disappearing.
 
 Jetman and the rover now use original, higher-detail pixel art. Jetman's four poses
 share a stable 17×20 design, while the rover has a 42-pixel outlined chassis,

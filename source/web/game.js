@@ -14,7 +14,7 @@
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.8.0-dev.3';
+const VERSION = '4.8.0-dev.4';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;
@@ -69,6 +69,11 @@ const SALVAGE_DROP_CHANCE = 0.24;
 const SALVAGE_KINDS = Object.freeze(['fuelcell', 'ammo', 'unstable']);
 const UNSTABLE_FUSE = 9;
 const RAPID_FIRE_TIME = 10;
+const COMMAND_FIRST_LEVEL = 4;
+const COMMAND_HP = 4;
+const COMMAND_CHARGE = 1.0;
+const COMMAND_EXPOSED = 1.6;
+const COMMAND_STAGGER = 0.65;
 const LEVEL_EVENTS = Object.freeze([
   Object.freeze({ id: 'solar', name: 'SOLAR INTERFERENCE', duration: 12 }),
   Object.freeze({ id: 'telefail', name: 'TELEPORTER OUTAGE', duration: 14 }),
@@ -82,6 +87,9 @@ const SECONDARY_OBJECTIVES = Object.freeze([
   Object.freeze({ id: 'quick', name: 'BEAT THE CLOCK', target: 30, unit: 'SECONDS LEFT' }),
 ]);
 function secondaryForLevel(level) { return SECONDARY_OBJECTIVES[mod(Math.max(1, trunc(level || 1)) - 1, SECONDARY_OBJECTIVES.length)]; }
+function commandEncounterForLevel(level, missionId = missionForLevel(level).id) {
+  return Math.max(1, trunc(level || 1)) >= COMMAND_FIRST_LEVEL && missionId === 'bomb';
+}
 ALIEN_SCORE.ufo = 250; ALIEN_SPEED.ufo = 45;
 const MISSION_TYPES = Object.freeze([
   Object.freeze({ id: 'bomb', name: 'BOMB RUN', briefing: 'DELIVER THE BOMB TO THE MISSILE SITE' }),
@@ -208,6 +216,13 @@ class Missile {
 class Base {
   constructor(x) { this.x = wrap(x); this.alive = true; this.t = 0; }
 }
+class CommandVehicle {
+  constructor(x) {
+    Object.assign(this, { x: wrap(x), dir: -1, hp: COMMAND_HP, hpMax: COMMAND_HP,
+      phase: 1, state: 'patrol', stateT: 2.4, targetX: null, hitT: 0, wheel: 0 });
+  }
+  shielded() { return this.state !== 'exposed'; }
+}
 
 class NoSfx { play() {} loop() {} stopLoops() {} }
 
@@ -234,6 +249,7 @@ class Game {
     this.p = new Player(HOME_X - 30, this.terr.base(HOME_X - 30));
     this.items = []; this.aliens = []; this.lasers = []; this.shells = []; this.missiles = [];
     this.parts = []; this.rings = []; this.booms = []; this.meteorWarnings = [];
+    this.commandVehicle = null;
     this.base = new Base(0);
     this.placeBase();
     for (let i = 0; i < 40 && this.terr.craters.length < 8; i++)
@@ -248,7 +264,8 @@ class Game {
     this.stats = { diverTelegraphs: 0, diverLaunches: 0, diverPlayerHits: 0, diverCrashes: 0,
       roverBlockEvents: 0, roverBridgesLaid: 0, levelTransitions: 0, diverHerds: 0,
       chaserGuards: 0, cargoThefts: 0, salvageDrops: 0, salvageRecovered: 0,
-      eventsStarted: 0, meteorImpacts: 0, secondaryCompleted: 0 };
+      eventsStarted: 0, meteorImpacts: 0, secondaryCompleted: 0,
+      commandAttacks: 0, commandHits: 0, commandDestroyed: 0 };
     this.startLevelProgression();
     this.nextBaseT = 0; this.kitT = 12; this.spawnT = 4;
     this.cam = this.p.x;
@@ -304,6 +321,7 @@ class Game {
   }
   startMission() {
     const r = this.rover;
+    this.commandVehicle = null;
     for (const it of [...this.items]) if (['bomb', 'supply', 'repair'].includes(it.kind)) removeItem(this.items, it);
     for (const it of this.cargoItems()) if (['bomb', 'supply', 'repair'].includes(it.kind)) this.removeCargo(it);
     r.disabled = false;
@@ -318,6 +336,11 @@ class Game {
       const repair = new Item('repair', this.missionSite(500, 900), GROUND - 70);
       this.items.push(repair); this.mission.targetX = repair.x; r.disabled = true;
     }
+    if (commandEncounterForLevel(this.level, type.id)) {
+      this.commandVehicle = new CommandVehicle(wrap(this.base.x + 58));
+      this.mission.briefing = 'DISABLE THE COMMAND VEHICLE, THEN DELIVER THE BOMB';
+      this.mission.major = true;
+    }
   }
   missionBrief() {
     const mode = this.classic ? 'CLASSIC' : 'ARCADE';
@@ -326,6 +349,7 @@ class Game {
     return `LEVEL ${this.level}: ${this.mission.name} - ${this.mission.briefing} [${mode}]${event}${optional}`;
   }
   missionTargetX() {
+    if (this.commandVehicle) return this.commandVehicle.x;
     if (this.mission.id === 'bomb') return this.base.x;
     const item = this.items.find(it => it.kind === this.mission.id || (this.mission.id === 'supply' && it.kind === 'supply'));
     return item ? item.x : this.rover.x;
@@ -408,6 +432,96 @@ class Game {
       if (!this.p.dead && !this.p.inRover && this.p.invuln <= 0
           && Math.abs(wdx(meteor.x, this.p.x)) < 13 && Math.abs(y - this.p.y) < 28) this.killPlayer();
     }
+  }
+
+  commandTargetX() {
+    const p = this.p;
+    return (p.inRover || p.dead) ? this.rover.x : p.x;
+  }
+
+  startCommandCharge() {
+    const v = this.commandVehicle;
+    if (!v || v.state !== 'patrol') return false;
+    v.state = 'charge';
+    v.stateT = v.phase === 1 ? COMMAND_CHARGE : COMMAND_CHARGE * 0.8;
+    v.targetX = this.commandTargetX();
+    this.playGameplayCue('missilewarn', 0.5);
+    this.flash('COMMAND STRIKE MARKED - MOVE!', 1.2);
+    return true;
+  }
+
+  resolveCommandStrike() {
+    const v = this.commandVehicle;
+    if (!v || v.state !== 'charge' || v.targetX === null) return false;
+    const x = v.targetX, y = this.terr.surface(x);
+    v.targetX = null;
+    this.stats.commandAttacks++;
+    this.explode(x, y, 24, 'RYOW', 65, 0.8, 35, 'ground');
+    this.sfx.play('boom'); this.shake = Math.max(this.shake, 0.45);
+    const p = this.p, close = Math.abs(wdx(x, this.commandTargetX())) < 17;
+    if (close && p.inRover) this.roverHit();
+    else if (close && !p.dead && p.invuln <= 0 && p.y >= y - 32) this.killPlayer();
+    if (!this.commandVehicle || this.over) return true;
+    v.state = 'exposed';
+    v.stateT = v.phase === 1 ? COMMAND_EXPOSED : COMMAND_EXPOSED * 0.8;
+    this.flash('COMMAND CORE EXPOSED', 1.3);
+    return true;
+  }
+
+  updateCommandVehicle(dt) {
+    const v = this.commandVehicle;
+    if (!v) return;
+    v.hitT = Math.max(0, v.hitT - dt);
+    v.stateT = Math.max(0, v.stateT - dt);
+    if (v.state === 'patrol') {
+      const speed = v.phase === 1 ? 14 : 21;
+      v.x = wrap(v.x + v.dir * speed * dt); v.wheel += v.dir * speed * dt / 3;
+      const fromBase = wdx(v.x, this.base.x);
+      if (Math.abs(fromBase) > 76) { v.dir = fromBase > 0 ? -1 : 1; v.x = wrap(this.base.x + Math.sign(fromBase) * 76); }
+      if (Math.abs(wdx(this.commandTargetX(), v.x)) > 260) v.stateT = Math.max(v.stateT, 0.4);
+      else if (v.stateT === 0) this.startCommandCharge();
+    } else if (v.state === 'charge') {
+      if (v.stateT === 0) this.resolveCommandStrike();
+    } else if (v.state === 'exposed') {
+      if (v.stateT === 0) { v.state = 'patrol'; v.stateT = v.phase === 1 ? 2.3 : 1.65; }
+    } else if (v.state === 'stagger' && v.stateT === 0) {
+      v.state = 'patrol'; v.stateT = v.phase === 1 ? 2.1 : 1.5;
+    }
+  }
+
+  hitCommandVehicle(v = this.commandVehicle) {
+    if (!v || v !== this.commandVehicle) return false;
+    const y = this.terr.base(v.x) - 9;
+    if (v.shielded()) {
+      v.hitT = 0.18;
+      this.explode(v.x, y, 5, 'CW', 24, 0.22);
+      this.playGameplayCue('blocked', 0.18);
+      this.flash('COMMAND SHIELD HOLDS', 0.8);
+      return false;
+    }
+    v.hp--; v.hitT = 0.28; this.stats.commandHits++;
+    this.explode(v.x, y, 12, 'WYOR', 45, 0.45, 25, 'small');
+    this.shake = Math.max(this.shake, 0.3);
+    if (v.hp <= 0) return this.destroyCommandVehicle(v);
+    v.phase = v.hp <= COMMAND_HP / 2 ? 2 : 1;
+    v.state = 'stagger'; v.stateT = COMMAND_STAGGER; v.targetX = null;
+    this.sfx.play('heavyhit');
+    this.flash(v.phase === 2 ? 'COMMAND CORE HIT - FASTER ATTACK CYCLE' : 'COMMAND CORE HIT - SHIELD REFORMING', 1.7);
+    return true;
+  }
+
+  destroyCommandVehicle(v = this.commandVehicle) {
+    if (!v || v !== this.commandVehicle) return false;
+    const y = this.terr.base(v.x);
+    this.commandVehicle = null;
+    this.stats.commandDestroyed++;
+    const bonus = 2500 * this.level;
+    this.addScore(bonus);
+    for (let i = 0; i < 4; i++) this.explode(wrap(v.x + this.rng.uniform(-14, 14)), y - this.rng.uniform(4, 15), 20, 'YORW', 75, 1.0);
+    this.explode(v.x, y, 16, 'YORW', 55, 1.1, 40, 'big');
+    this.shake = 1; this.sfx.play('bigboom');
+    this.flash(`COMMAND VEHICLE DESTROYED!  BONUS ${bonus}`, 3);
+    return true;
   }
 
   progressSecondary(id, amount = 1) {
@@ -499,6 +613,7 @@ class Game {
     this.updateRover(dt, inp);
     this.updateItems(dt);
     this.updateMission();
+    this.updateCommandVehicle(dt);
     this.updateAliens(dt);
     this.updateShots(dt);
     if (this.over) return;
@@ -674,6 +789,11 @@ class Game {
     const r = this.rover;
     const x = r.trailerX(), y = this.trailerTop() - 6;
     let target = null, bd = 1e9;
+    if (this.commandVehicle) {
+      const v = this.commandVehicle, vy = this.terr.base(v.x) - 9;
+      const d = Math.hypot(wdx(v.x, x), vy - y);
+      if (d < 220) { bd = d; target = { x: v.x, y: vy }; }
+    }
     for (const a of this.aliens) {
       const d = Math.hypot(wdx(a.x, x), a.y - y);
       if (d < bd && d < 220 && a.y < y) { bd = d; target = a; }
@@ -798,7 +918,12 @@ class Game {
       it.y += it.vy * dt;
       const b = this.base;
       if (it.kind === 'bomb' && b.alive && Math.abs(wdx(it.x, b.x)) < 18 && it.y >= t.base(b.x) - 17) {
-        removeItem(this.items, it); this.destroyBase(); continue;
+        if (this.destroyBase()) removeItem(this.items, it);
+        else {
+          const side = Math.sign(wdx(it.x, b.x)) || -1;
+          it.x = wrap(b.x + side * 28); it.y = t.surface(it.x); it.vx = it.vy = 0; it.state = 'ground';
+        }
+        continue;
       }
       if (it.kind === 'bridge') {
         const c = t.craterAt(it.x);
@@ -1089,6 +1214,13 @@ class Game {
             this.killAlien(a); L.len = Math.max(d, 2); L.dead = true; L.attached = false; break;
           }
         }
+        if (!L.dead && this.commandVehicle) {
+          const v = this.commandVehicle, d = wdx(v.x, L.x0) * L.dir;
+          const vy = this.terr.base(v.x) - 9;
+          if (d >= -18 && d <= L.len + 18 && Math.abs(vy - L.y) < 10) {
+            this.hitCommandVehicle(v); L.len = Math.max(d - 18, 2); L.dead = true; L.attached = false;
+          }
+        }
         if (!L.dead) {
           for (const m of [...this.missiles]) {
             const d = wdx(m.x, L.x0) * L.dir;
@@ -1105,6 +1237,10 @@ class Game {
       let hit = false;
       for (const a of [...this.aliens]) {
         if (Math.abs(wdx(a.x, s[0])) < 7 && Math.abs(a.y - s[1]) < 7) { this.killAlien(a); hit = true; break; }
+      }
+      if (!hit && this.commandVehicle) {
+        const v = this.commandVehicle, vy = this.terr.base(v.x) - 9;
+        if (Math.abs(wdx(v.x, s[0])) < 20 && Math.abs(vy - s[1]) < 11) { this.hitCommandVehicle(v); hit = true; }
       }
       if (!hit) {
         for (const m of [...this.missiles]) {
@@ -1182,7 +1318,12 @@ class Game {
   }
 
   destroyBase() {
-    if (this.mission.id !== 'bomb' || this.mission.completed) return;
+    if (this.mission.id !== 'bomb' || this.mission.completed) return false;
+    if (this.commandVehicle) {
+      this.playGameplayCue('blocked', 0.3);
+      this.flash('MISSILE SITE SHIELDED - DESTROY COMMAND VEHICLE', 2.5);
+      return false;
+    }
     const b = this.base;
     const y = this.terr.base(b.x) - 8;
     for (let i = 0; i < 5; i++) this.explode(wrap(b.x + uni(-18, 18)), y + uni(-10, 5), 35, 'YORW', 90, 1.4);
@@ -1193,6 +1334,7 @@ class Game {
     // 10 points per second left on the clock. Rewards rushing, which is the point.
     const bonus = 2000 * this.level + trunc(this.timer) * 10;
     this.completeMission(`MISSILE SITE DESTROYED!  BONUS ${bonus}`, bonus, 'bigboom');
+    return true;
   }
 
   updateBase(dt) {
@@ -1236,5 +1378,6 @@ if (typeof module !== 'undefined') {
     DIVER_WARNING, DIVER_AIM_LEAD, DIVER_LOCK_RANGE, LOW_FUEL_LEVEL,
     LOW_FUEL_RESET, LOW_FUEL_REPEAT, SALVAGE_DROP_CHANCE, SALVAGE_KINDS, UNSTABLE_FUSE, RAPID_FIRE_TIME,
     LEVEL_EVENTS, eventForLevel, SECONDARY_OBJECTIVES, secondaryForLevel,
-    Game, Alien, Laser, Missile, Item, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
+    COMMAND_FIRST_LEVEL, COMMAND_HP, COMMAND_CHARGE, COMMAND_EXPOSED, COMMAND_STAGGER, commandEncounterForLevel,
+    Game, Alien, Laser, Missile, Item, CommandVehicle, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
 }

@@ -1,27 +1,29 @@
-# Test report — v4.8.0-dev.3
+# Test report — v4.8.0-dev.4
 
-Tested on 6 November 2026 from the development branch.
+Tested on 15 November 2026 from the development branch.
 
 ## Development milestone
 
-- Solar interference, teleporter outages, meteor fronts and low-gravity surges
-  passed their deterministic rotation and recovery checks.
-- Teleporters rejected travel only while their outage was active. Meteor warnings
-  produced real craters, and the low-gravity event altered live physics rather
-  than merely putting an optimistic caption on the screen.
-- Alien-hunting, salvage-recovery and quick-finish secondary objectives passed,
-  including score awards and the rule that a missed optional objective cannot
-  block the primary mission.
+- Command-vehicle gating, shielding, target marking, reaction time, exposed-core
+  punishment, faster damaged phase, score award and destruction passed.
+- The missile site remained protected while the vehicle lived. A premature bomb
+  was rejected without being lost, and the normal mission completed once the
+  shield source had gone.
+- An ignored marked strike hit Jetman; moving before impact remained valid
+  counterplay. The art stage showed the mobile vehicle, shield brackets, charged
+  cannon, ground marker, scanner contact and HUD state at level four.
+- Solar interference, teleporter outages, meteor fronts, low-gravity surges and
+  all three optional objectives passed again.
 - Diver/heavy herding, chaser site defence, UFO cargo theft/recovery and the full
   salvage loop passed again.
 - Mission rotation, all four loadouts, Classic mode and the complete earlier
   mechanics, controller, art and audio suites passed again.
-- The rebuilt 214 KB single-file browser completed a 12,000-frame headless soak:
-  `SELFTEST OK frames=12000 games=1 maxLevel=1 ms=16472 audio=suspended buffers=28 ambience=6 music=30.0s`.
+- The rebuilt 223 KB single-file browser completed a 12,000-frame headless soak:
+  `SELFTEST OK frames=12000 games=1 maxLevel=1 ms=15075 audio=suspended buffers=28 ambience=6 music=30.0s`.
 - Project-facing wording contains no prohibited development-tool references.
 
 The development browser's interactive console could not be inspected during this
-run, so no console-clean claim is made for dev.3. Syntax, regression and self-test
+run, so no console-clean claim is made for dev.4. Syntax, regression and self-test
 results remain recorded separately rather than being dressed up as the same thing.
 
 A physical-controller playthrough remains unverified. Hardware remains hardware,

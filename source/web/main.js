@@ -317,6 +317,7 @@ function drawWorld(c, g, now) {
   drawDepot(c, g, now);
   for (const tp of g.tele) drawTeleporter(c, g, tp, now);
   drawBase(c, g, now);
+  drawCommandVehicle(c, g, now);
   for (const meteor of g.meteorWarnings) {
     const sx = gsx(g, meteor.x), gy = g.terr.surface(meteor.x);
     if (sx < -20 || sx > W + 20) continue;
@@ -466,6 +467,50 @@ function drawBase(c, g, now) {
   line(c, PALC.W, sx - ca, gy - 25, sx + ca, gy - 25);
 }
 
+function drawCommandVehicle(c, g, now) {
+  const v = g.commandVehicle;
+  if (!v) return;
+  if (v.state === 'charge' && v.targetX !== null) {
+    const tx = gsx(g, v.targetX), ty = g.terr.surface(v.targetX);
+    if (tx > -30 && tx < W + 30) {
+      const col = trunc(now * 14) % 2 ? PALC.R : PALC.Y;
+      line(c, col, tx - 9, ty - 2, tx + 9, ty - 2);
+      line(c, col, tx, ty - 12, tx, ty + 1);
+      for (let y = CEILING + 2; y < ty - 14; y += 7) P(c, PALC.R, tx, y);
+    }
+  }
+  const sx = gsx(g, v.x);
+  if (sx <= -50 || sx >= W + 50) return;
+  const gy = g.terr.base(v.x), damaged = v.phase === 2;
+  const body = damaged ? PALC.r : PALC.M, edge = damaged ? PALC.R : PALC.C;
+  R(c, PALC.K, sx - 18, gy - 5, 36, 5);
+  for (const wx of [-13, -5, 5, 13]) {
+    circ(c, PALC.w, sx + wx, gy - 3, 3, 0, true);
+    P(c, trunc(v.wheel + wx) % 2 ? PALC.W : PALC.K, sx + wx, gy - 3);
+  }
+  R(c, body, sx - 16, gy - 13, 32, 8);
+  strokeR(c, edge, sx - 16, gy - 13, 32, 8);
+  R(c, PALC.K, sx - 7, gy - 18, 14, 5);
+  line(c, edge, sx + v.dir * 2, gy - 17, sx + v.dir * 17, gy - 19, 2);
+  const core = v.state === 'exposed' ? (trunc(now * 12) % 2 ? PALC.W : PALC.C) : PALC.K;
+  R(c, core, sx - 3, gy - 12, 6, 5);
+  for (let i = 0; i < v.hp; i++) P(c, PALC.G, sx - 7 + i * 5, gy - 7);
+  if (v.shielded()) {
+    const shield = v.hitT > 0 ? PALC.W : (trunc(now * 8) % 2 ? PALC.C : PALC.c);
+    line(c, shield, sx - 22, gy - 16, sx - 22, gy - 8);
+    line(c, shield, sx - 22, gy - 16, sx - 17, gy - 21);
+    line(c, shield, sx + 22, gy - 16, sx + 22, gy - 8);
+    line(c, shield, sx + 22, gy - 16, sx + 17, gy - 21);
+  } else {
+    line(c, PALC.Y, sx - 6, gy - 22, sx, gy - 26);
+    line(c, PALC.Y, sx, gy - 26, sx + 6, gy - 22);
+  }
+  if (v.state === 'charge') {
+    const glow = trunc(now * 16) % 2 ? PALC.R : PALC.Y;
+    circ(c, glow, sx + v.dir * 18, gy - 19, 3, 1);
+  }
+}
+
 function drawRover(c, g, now) {
   const r = g.rover, sx = gsx(g, r.x);
   if (sx <= -70 || sx >= W + 70) return;
@@ -580,6 +625,7 @@ function drawHud(f, g, now, hiscore) {
   for (const tp of g.tele) R(f, PALC.C, px(tp) - 2, sy0 + 1, 4, 3);
   R(f, PALC.B, px(HOME_X) - 3, sy0 + 1, 6, 8);
   if (g.base.alive) R(f, trunc(now * 4) % 2 ? PALC.R : PALC.Y, px(g.base.x) - 4, sy0, 8, sh);
+  if (g.commandVehicle) R(f, PALC.M, px(g.commandVehicle.x) - 3, sy0 + 1, 7, 7);
   for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w, supply: PALC.C,
     repair: PALC.G, fuelcell: PALC.G, ammo: PALC.Y, unstable: PALC.M }[it.kind] || PALC.W, px(it.x) - 1, sy0 + 2, 3, 3);
   for (const a of g.aliens) R(f, PALC.M, px(a.x), sy0 + 3, 2, 2);
@@ -606,6 +652,12 @@ function drawHud(f, g, now, hiscore) {
     text(f, 18, `OPTIONAL ${g.secondary.name}: ${status}`, 20, 112,
       g.secondary.completed ? PALC.G : (g.secondary.failed ? PALC.r : PALC.C));
   }
+  if (g.commandVehicle) {
+    const v = g.commandVehicle;
+    const state = v.state === 'exposed' ? 'CORE EXPOSED' : (v.state === 'charge' ? 'STRIKE CHARGING' : 'SHIELDED');
+    text(f, 18, `COMMAND ${v.hp}/${v.hpMax}: ${state}`, 860, 90,
+      v.state === 'exposed' ? PALC.Y : (v.state === 'charge' ? PALC.R : PALC.C));
+  }
   if (r.blocked && g.p.inRover) {
     const instruction = r.bridges ? 'CRATER AHEAD — PRESS X TO LAY A BRIDGE' : 'CRATER AHEAD — NO BRIDGES';
     R(f, 'rgba(5,8,20,.82)', 330, 86, 620, 34);
@@ -616,16 +668,17 @@ function drawHud(f, g, now, hiscore) {
 
 function drawTelemetry(f, g) {
   const s = g.stats, p = S.pad;
-  R(f, 'rgba(5,8,20,.88)', 18, 128, 390, 194);
-  strokeR(f, PALC.C, 18, 128, 390, 194);
+  R(f, 'rgba(5,8,20,.88)', 18, 128, 410, 218);
+  strokeR(f, PALC.C, 18, 128, 410, 218);
   text(f, 18, 'FIELD TELEMETRY — F2 CLOSES', 34, 140, PALC.C);
   text(f, 16, `DIVER WARN ${s.diverTelegraphs}  LAUNCH ${s.diverLaunches}  CRASH ${s.diverCrashes}`, 34, 174, PALC.W);
   text(f, 16, `DIVER HITS ${s.diverPlayerHits}  ROVER BLOCKS ${s.roverBlockEvents}`, 34, 202, PALC.W);
   text(f, 16, `HERDS ${s.diverHerds}  GUARDS ${s.chaserGuards}  THEFTS ${s.cargoThefts}`, 34, 230, PALC.W);
   text(f, 16, `EVENTS ${s.eventsStarted}  METEORS ${s.meteorImpacts}  OPTIONAL ${s.secondaryCompleted}`, 34, 252, PALC.W);
   text(f, 16, `SALVAGE ${s.salvageRecovered}/${s.salvageDrops}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 274, PALC.W);
+  text(f, 16, `COMMAND ATTACKS ${s.commandAttacks}  HITS ${s.commandHits}  KILLS ${s.commandDestroyed}`, 34, 296, PALC.W);
   const active = p.activeIndex === null ? '-' : p.activeIndex;
-  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 296, PALC.Y);
+  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 318, PALC.Y);
 }
 
 const TITLE_LINES = [
@@ -643,6 +696,7 @@ const HOWTO = [
   'Rover refuels your jetpac. Aliens crashing make new craters!',
   'If the countdown ends, shoot down the missile chasing your rover.',
   'Enemy salvage can refuel, boost fire or explode while you carry it.',
+  'Later bomb runs add a shielded command vehicle. Move, then punish.',
 ];
 function drawTitle(f, now, hiscore) {
   R(f, 'rgba(0,0,10,0.59)', 0, 0, HI_W, HI_H);
@@ -1177,12 +1231,16 @@ function runSelftest(n) {
 function stageScene(level = 6) {
   const chosenLevel = Math.max(1, Math.min(6, trunc(level) || 6));
   const g = new Game(sfx, 2);
-  g.level = chosenLevel; g.timer = g.levelTime();
+  g.level = chosenLevel; g.placeBase(); g.startMission(); g.startLevelProgression(); g.timer = g.levelTime();
   S.g = g; S.state = 'play';
   for (let i = 0; i < 60; i++) g.update(1 / 60, newInput());
   const r = g.rover; r.x = wrap(g.base.x - 90);
   const bomb = g.items.find(i => i.kind === 'bomb'); r.cargo = bomb; bomb.state = 'trailer';
   g.p.x = wrap(g.base.x - 40); g.p.y = 110; g.p.onGround = false; g.cam = g.p.x;
+  if (g.commandVehicle) {
+    g.commandVehicle.state = 'charge'; g.commandVehicle.stateT = COMMAND_CHARGE * 0.7;
+    g.commandVehicle.targetX = wrap(g.p.x + 32);
+  }
   ['drifter', 'chaser', 'bouncer', 'diver', 'heavy', 'ufo'].forEach((k, i) => g.aliens.push(new Alien(k, wrap(g.cam - 140 + i * 52), 50 + (i % 2) * 40, 1, 0)));
   const stagedHeavy = g.aliens.find(a => a.kind === 'heavy');
   stagedHeavy.hp = 1; // persistent damaged frames

@@ -4,6 +4,7 @@
 const L = require('../web/game.js');
 const { Game, Alien, Missile, LEVEL_PROFILES, levelProfile, MISSION_TYPES, missionForLevel,
   LOADOUTS, LEVEL_EVENTS, eventForLevel, SECONDARY_OBJECTIVES, secondaryForLevel,
+  COMMAND_FIRST_LEVEL, COMMAND_HP, COMMAND_CHARGE, commandEncounterForLevel,
   newInput, wrap, wdx } = L;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exit(1); } };
 
@@ -235,6 +236,46 @@ g = G(); g.level = 3; g.startMission(); g.startLevelProgression(); g.timer = 20;
 g.completeMission('TEST COMPLETE', 0);
 assert(g.secondary.failed && !g.secondary.completed, 'missed optional objective does not block mission completion');
 console.log('secondary objectives ok');
+
+assert(COMMAND_FIRST_LEVEL === 4 && commandEncounterForLevel(4, 'bomb')
+  && !commandEncounterForLevel(3, 'bomb') && !commandEncounterForLevel(5, 'supply'),
+  'command encounter starts with the later bomb runs only');
+g = G(); g.level = 4; g.placeBase(); g.startMission();
+let command = g.commandVehicle;
+assert(command && command.hp === COMMAND_HP && g.mission.major
+  && g.mission.briefing.includes('COMMAND VEHICLE'), 'level four creates the mobile command encounter');
+const shieldHp = command.hp;
+assert(!g.hitCommandVehicle(command) && command.hp === shieldHp, 'shielded vehicle rejects damage');
+g.p.invuln = 10; g.p.x = wrap(command.x + 20); g.p.y = g.terr.surface(g.p.x);
+command.stateT = 0; g.updateCommandVehicle(0.01);
+assert(command.state === 'charge' && command.targetX !== null && g.stats.commandAttacks === 0,
+  'command strike visibly locks a target before firing');
+g.updateCommandVehicle(COMMAND_CHARGE * 0.5);
+assert(command.state === 'charge', 'command strike preserves its reaction window');
+g.updateCommandVehicle(COMMAND_CHARGE);
+assert(command.state === 'exposed' && g.stats.commandAttacks === 1, 'finished strike opens a punish window');
+const commandScore = g.score;
+assert(g.hitCommandVehicle(command) && command.hp === COMMAND_HP - 1 && command.state === 'stagger',
+  'exposed core accepts one hit and enters recovery');
+for (let i = 0; i < COMMAND_HP - 1; i++) { command.state = 'exposed'; g.hitCommandVehicle(command); }
+assert(!g.commandVehicle && g.stats.commandHits === COMMAND_HP && g.stats.commandDestroyed === 1
+  && g.score === commandScore + 2500 * g.level, 'four readable openings destroy and score the command vehicle');
+
+g = G(); g.level = 4; g.placeBase(); g.startMission();
+let encounterBomb = g.items.find(it => it.kind === 'bomb');
+encounterBomb.x = g.base.x; encounterBomb.y = g.terr.base(g.base.x); encounterBomb.state = 'fall';
+g.updateItems(0);
+assert(g.items.includes(encounterBomb) && g.base.alive && !g.mission.completed
+  && Math.abs(wdx(encounterBomb.x, g.base.x)) >= 18, 'shielded site rejects the bomb without deleting it');
+g.commandVehicle = null; encounterBomb.x = g.base.x; encounterBomb.y = g.terr.base(g.base.x); encounterBomb.state = 'fall';
+g.updateItems(0);
+assert(!g.items.includes(encounterBomb) && g.mission.completed, 'bomb works normally once the command vehicle is gone');
+g = G(); g.level = 4; g.placeBase(); g.startMission(); command = g.commandVehicle;
+g.p.inRover = false; g.p.invuln = 0; g.p.dead = false; g.p.x = command.x; g.p.y = g.terr.surface(command.x);
+command.state = 'charge'; command.targetX = g.p.x; command.stateT = 0;
+g.updateCommandVehicle(0.01);
+assert(g.p.dead, 'ignoring the marked ground strike remains properly dangerous');
+console.log('command vehicle encounter ok');
 
 // sound is code now - make sure every recipe and the music render to something sane
 const { SFX_RECIPES, renderSfx } = require('../web/sfx.js');

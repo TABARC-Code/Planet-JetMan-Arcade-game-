@@ -1,5 +1,22 @@
 # Programmer notes — browser 4.8.0 development
 
+For dev.4 I made the command vehicle an encounter rather than a large numerical
+complaint. It marks the ground, fires, drops its shield and offers one clean punish
+window. Four successful reads destroy it. At half strength the body turns ragged
+red and the cycle accelerates, but the warning remains a warning rather than a
+posthumous explanation.
+
+The vehicle protects later bomb sites, so the old delivery loop now has a sharp
+combat interruption without becoming a separate boss game. A premature bomb is
+pushed clear and remains recoverable. Deleting the mission item would have been
+very tough, admittedly, though chiefly on the player's opinion of the programmer.
+
+I kept the collision boxes tied to what the drawing says: a broad vehicle core,
+a visible ground marker and one hit per exposed phase. The final release pass still
+needs the complete regression, package extraction checks and accurate release notes.
+
+## v4.8.0-dev.3 notes
+
 For dev.3 I added four disruptions, but kept them legible. Solar static breaks the
 scanner rather than the controls. Teleporter outages turn both pads red. Meteors
 paint the ground before arriving, and low gravity changes the actual simulation —
@@ -10,9 +27,9 @@ or thirty seconds left on the clock. They pay 500 points per level and never hol
 the main mission hostage. An optional objective which becomes compulsory has
 simply acquired a false moustache.
 
-The next pass is the mobile command vehicle encounter, followed by the full release
-regression and packaging work. That encounter needs proper phases and readable
-counterplay; a large health bar with wheels would be cheaper, but not better.
+The next pass was the mobile command vehicle encounter, followed by the full release
+regression and packaging work. That encounter needed proper phases and readable
+counterplay; a large health bar with wheels would have been cheaper, but not better.
 
 ## v4.8.0-dev.2 notes
 

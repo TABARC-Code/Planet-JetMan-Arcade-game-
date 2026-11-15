@@ -120,7 +120,7 @@ const ASSET_DATA = {
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.8.0-dev.3';
+const VERSION = '4.8.0-dev.4';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;
@@ -175,6 +175,11 @@ const SALVAGE_DROP_CHANCE = 0.24;
 const SALVAGE_KINDS = Object.freeze(['fuelcell', 'ammo', 'unstable']);
 const UNSTABLE_FUSE = 9;
 const RAPID_FIRE_TIME = 10;
+const COMMAND_FIRST_LEVEL = 4;
+const COMMAND_HP = 4;
+const COMMAND_CHARGE = 1.0;
+const COMMAND_EXPOSED = 1.6;
+const COMMAND_STAGGER = 0.65;
 const LEVEL_EVENTS = Object.freeze([
   Object.freeze({ id: 'solar', name: 'SOLAR INTERFERENCE', duration: 12 }),
   Object.freeze({ id: 'telefail', name: 'TELEPORTER OUTAGE', duration: 14 }),
@@ -188,6 +193,9 @@ const SECONDARY_OBJECTIVES = Object.freeze([
   Object.freeze({ id: 'quick', name: 'BEAT THE CLOCK', target: 30, unit: 'SECONDS LEFT' }),
 ]);
 function secondaryForLevel(level) { return SECONDARY_OBJECTIVES[mod(Math.max(1, trunc(level || 1)) - 1, SECONDARY_OBJECTIVES.length)]; }
+function commandEncounterForLevel(level, missionId = missionForLevel(level).id) {
+  return Math.max(1, trunc(level || 1)) >= COMMAND_FIRST_LEVEL && missionId === 'bomb';
+}
 ALIEN_SCORE.ufo = 250; ALIEN_SPEED.ufo = 45;
 const MISSION_TYPES = Object.freeze([
   Object.freeze({ id: 'bomb', name: 'BOMB RUN', briefing: 'DELIVER THE BOMB TO THE MISSILE SITE' }),
@@ -314,6 +322,13 @@ class Missile {
 class Base {
   constructor(x) { this.x = wrap(x); this.alive = true; this.t = 0; }
 }
+class CommandVehicle {
+  constructor(x) {
+    Object.assign(this, { x: wrap(x), dir: -1, hp: COMMAND_HP, hpMax: COMMAND_HP,
+      phase: 1, state: 'patrol', stateT: 2.4, targetX: null, hitT: 0, wheel: 0 });
+  }
+  shielded() { return this.state !== 'exposed'; }
+}
 
 class NoSfx { play() {} loop() {} stopLoops() {} }
 
@@ -340,6 +355,7 @@ class Game {
     this.p = new Player(HOME_X - 30, this.terr.base(HOME_X - 30));
     this.items = []; this.aliens = []; this.lasers = []; this.shells = []; this.missiles = [];
     this.parts = []; this.rings = []; this.booms = []; this.meteorWarnings = [];
+    this.commandVehicle = null;
     this.base = new Base(0);
     this.placeBase();
     for (let i = 0; i < 40 && this.terr.craters.length < 8; i++)
@@ -354,7 +370,8 @@ class Game {
     this.stats = { diverTelegraphs: 0, diverLaunches: 0, diverPlayerHits: 0, diverCrashes: 0,
       roverBlockEvents: 0, roverBridgesLaid: 0, levelTransitions: 0, diverHerds: 0,
       chaserGuards: 0, cargoThefts: 0, salvageDrops: 0, salvageRecovered: 0,
-      eventsStarted: 0, meteorImpacts: 0, secondaryCompleted: 0 };
+      eventsStarted: 0, meteorImpacts: 0, secondaryCompleted: 0,
+      commandAttacks: 0, commandHits: 0, commandDestroyed: 0 };
     this.startLevelProgression();
     this.nextBaseT = 0; this.kitT = 12; this.spawnT = 4;
     this.cam = this.p.x;
@@ -410,6 +427,7 @@ class Game {
   }
   startMission() {
     const r = this.rover;
+    this.commandVehicle = null;
     for (const it of [...this.items]) if (['bomb', 'supply', 'repair'].includes(it.kind)) removeItem(this.items, it);
     for (const it of this.cargoItems()) if (['bomb', 'supply', 'repair'].includes(it.kind)) this.removeCargo(it);
     r.disabled = false;
@@ -424,6 +442,11 @@ class Game {
       const repair = new Item('repair', this.missionSite(500, 900), GROUND - 70);
       this.items.push(repair); this.mission.targetX = repair.x; r.disabled = true;
     }
+    if (commandEncounterForLevel(this.level, type.id)) {
+      this.commandVehicle = new CommandVehicle(wrap(this.base.x + 58));
+      this.mission.briefing = 'DISABLE THE COMMAND VEHICLE, THEN DELIVER THE BOMB';
+      this.mission.major = true;
+    }
   }
   missionBrief() {
     const mode = this.classic ? 'CLASSIC' : 'ARCADE';
@@ -432,6 +455,7 @@ class Game {
     return `LEVEL ${this.level}: ${this.mission.name} - ${this.mission.briefing} [${mode}]${event}${optional}`;
   }
   missionTargetX() {
+    if (this.commandVehicle) return this.commandVehicle.x;
     if (this.mission.id === 'bomb') return this.base.x;
     const item = this.items.find(it => it.kind === this.mission.id || (this.mission.id === 'supply' && it.kind === 'supply'));
     return item ? item.x : this.rover.x;
@@ -514,6 +538,96 @@ class Game {
       if (!this.p.dead && !this.p.inRover && this.p.invuln <= 0
           && Math.abs(wdx(meteor.x, this.p.x)) < 13 && Math.abs(y - this.p.y) < 28) this.killPlayer();
     }
+  }
+
+  commandTargetX() {
+    const p = this.p;
+    return (p.inRover || p.dead) ? this.rover.x : p.x;
+  }
+
+  startCommandCharge() {
+    const v = this.commandVehicle;
+    if (!v || v.state !== 'patrol') return false;
+    v.state = 'charge';
+    v.stateT = v.phase === 1 ? COMMAND_CHARGE : COMMAND_CHARGE * 0.8;
+    v.targetX = this.commandTargetX();
+    this.playGameplayCue('missilewarn', 0.5);
+    this.flash('COMMAND STRIKE MARKED - MOVE!', 1.2);
+    return true;
+  }
+
+  resolveCommandStrike() {
+    const v = this.commandVehicle;
+    if (!v || v.state !== 'charge' || v.targetX === null) return false;
+    const x = v.targetX, y = this.terr.surface(x);
+    v.targetX = null;
+    this.stats.commandAttacks++;
+    this.explode(x, y, 24, 'RYOW', 65, 0.8, 35, 'ground');
+    this.sfx.play('boom'); this.shake = Math.max(this.shake, 0.45);
+    const p = this.p, close = Math.abs(wdx(x, this.commandTargetX())) < 17;
+    if (close && p.inRover) this.roverHit();
+    else if (close && !p.dead && p.invuln <= 0 && p.y >= y - 32) this.killPlayer();
+    if (!this.commandVehicle || this.over) return true;
+    v.state = 'exposed';
+    v.stateT = v.phase === 1 ? COMMAND_EXPOSED : COMMAND_EXPOSED * 0.8;
+    this.flash('COMMAND CORE EXPOSED', 1.3);
+    return true;
+  }
+
+  updateCommandVehicle(dt) {
+    const v = this.commandVehicle;
+    if (!v) return;
+    v.hitT = Math.max(0, v.hitT - dt);
+    v.stateT = Math.max(0, v.stateT - dt);
+    if (v.state === 'patrol') {
+      const speed = v.phase === 1 ? 14 : 21;
+      v.x = wrap(v.x + v.dir * speed * dt); v.wheel += v.dir * speed * dt / 3;
+      const fromBase = wdx(v.x, this.base.x);
+      if (Math.abs(fromBase) > 76) { v.dir = fromBase > 0 ? -1 : 1; v.x = wrap(this.base.x + Math.sign(fromBase) * 76); }
+      if (Math.abs(wdx(this.commandTargetX(), v.x)) > 260) v.stateT = Math.max(v.stateT, 0.4);
+      else if (v.stateT === 0) this.startCommandCharge();
+    } else if (v.state === 'charge') {
+      if (v.stateT === 0) this.resolveCommandStrike();
+    } else if (v.state === 'exposed') {
+      if (v.stateT === 0) { v.state = 'patrol'; v.stateT = v.phase === 1 ? 2.3 : 1.65; }
+    } else if (v.state === 'stagger' && v.stateT === 0) {
+      v.state = 'patrol'; v.stateT = v.phase === 1 ? 2.1 : 1.5;
+    }
+  }
+
+  hitCommandVehicle(v = this.commandVehicle) {
+    if (!v || v !== this.commandVehicle) return false;
+    const y = this.terr.base(v.x) - 9;
+    if (v.shielded()) {
+      v.hitT = 0.18;
+      this.explode(v.x, y, 5, 'CW', 24, 0.22);
+      this.playGameplayCue('blocked', 0.18);
+      this.flash('COMMAND SHIELD HOLDS', 0.8);
+      return false;
+    }
+    v.hp--; v.hitT = 0.28; this.stats.commandHits++;
+    this.explode(v.x, y, 12, 'WYOR', 45, 0.45, 25, 'small');
+    this.shake = Math.max(this.shake, 0.3);
+    if (v.hp <= 0) return this.destroyCommandVehicle(v);
+    v.phase = v.hp <= COMMAND_HP / 2 ? 2 : 1;
+    v.state = 'stagger'; v.stateT = COMMAND_STAGGER; v.targetX = null;
+    this.sfx.play('heavyhit');
+    this.flash(v.phase === 2 ? 'COMMAND CORE HIT - FASTER ATTACK CYCLE' : 'COMMAND CORE HIT - SHIELD REFORMING', 1.7);
+    return true;
+  }
+
+  destroyCommandVehicle(v = this.commandVehicle) {
+    if (!v || v !== this.commandVehicle) return false;
+    const y = this.terr.base(v.x);
+    this.commandVehicle = null;
+    this.stats.commandDestroyed++;
+    const bonus = 2500 * this.level;
+    this.addScore(bonus);
+    for (let i = 0; i < 4; i++) this.explode(wrap(v.x + this.rng.uniform(-14, 14)), y - this.rng.uniform(4, 15), 20, 'YORW', 75, 1.0);
+    this.explode(v.x, y, 16, 'YORW', 55, 1.1, 40, 'big');
+    this.shake = 1; this.sfx.play('bigboom');
+    this.flash(`COMMAND VEHICLE DESTROYED!  BONUS ${bonus}`, 3);
+    return true;
   }
 
   progressSecondary(id, amount = 1) {
@@ -605,6 +719,7 @@ class Game {
     this.updateRover(dt, inp);
     this.updateItems(dt);
     this.updateMission();
+    this.updateCommandVehicle(dt);
     this.updateAliens(dt);
     this.updateShots(dt);
     if (this.over) return;
@@ -780,6 +895,11 @@ class Game {
     const r = this.rover;
     const x = r.trailerX(), y = this.trailerTop() - 6;
     let target = null, bd = 1e9;
+    if (this.commandVehicle) {
+      const v = this.commandVehicle, vy = this.terr.base(v.x) - 9;
+      const d = Math.hypot(wdx(v.x, x), vy - y);
+      if (d < 220) { bd = d; target = { x: v.x, y: vy }; }
+    }
     for (const a of this.aliens) {
       const d = Math.hypot(wdx(a.x, x), a.y - y);
       if (d < bd && d < 220 && a.y < y) { bd = d; target = a; }
@@ -904,7 +1024,12 @@ class Game {
       it.y += it.vy * dt;
       const b = this.base;
       if (it.kind === 'bomb' && b.alive && Math.abs(wdx(it.x, b.x)) < 18 && it.y >= t.base(b.x) - 17) {
-        removeItem(this.items, it); this.destroyBase(); continue;
+        if (this.destroyBase()) removeItem(this.items, it);
+        else {
+          const side = Math.sign(wdx(it.x, b.x)) || -1;
+          it.x = wrap(b.x + side * 28); it.y = t.surface(it.x); it.vx = it.vy = 0; it.state = 'ground';
+        }
+        continue;
       }
       if (it.kind === 'bridge') {
         const c = t.craterAt(it.x);
@@ -1195,6 +1320,13 @@ class Game {
             this.killAlien(a); L.len = Math.max(d, 2); L.dead = true; L.attached = false; break;
           }
         }
+        if (!L.dead && this.commandVehicle) {
+          const v = this.commandVehicle, d = wdx(v.x, L.x0) * L.dir;
+          const vy = this.terr.base(v.x) - 9;
+          if (d >= -18 && d <= L.len + 18 && Math.abs(vy - L.y) < 10) {
+            this.hitCommandVehicle(v); L.len = Math.max(d - 18, 2); L.dead = true; L.attached = false;
+          }
+        }
         if (!L.dead) {
           for (const m of [...this.missiles]) {
             const d = wdx(m.x, L.x0) * L.dir;
@@ -1211,6 +1343,10 @@ class Game {
       let hit = false;
       for (const a of [...this.aliens]) {
         if (Math.abs(wdx(a.x, s[0])) < 7 && Math.abs(a.y - s[1]) < 7) { this.killAlien(a); hit = true; break; }
+      }
+      if (!hit && this.commandVehicle) {
+        const v = this.commandVehicle, vy = this.terr.base(v.x) - 9;
+        if (Math.abs(wdx(v.x, s[0])) < 20 && Math.abs(vy - s[1]) < 11) { this.hitCommandVehicle(v); hit = true; }
       }
       if (!hit) {
         for (const m of [...this.missiles]) {
@@ -1288,7 +1424,12 @@ class Game {
   }
 
   destroyBase() {
-    if (this.mission.id !== 'bomb' || this.mission.completed) return;
+    if (this.mission.id !== 'bomb' || this.mission.completed) return false;
+    if (this.commandVehicle) {
+      this.playGameplayCue('blocked', 0.3);
+      this.flash('MISSILE SITE SHIELDED - DESTROY COMMAND VEHICLE', 2.5);
+      return false;
+    }
     const b = this.base;
     const y = this.terr.base(b.x) - 8;
     for (let i = 0; i < 5; i++) this.explode(wrap(b.x + uni(-18, 18)), y + uni(-10, 5), 35, 'YORW', 90, 1.4);
@@ -1299,6 +1440,7 @@ class Game {
     // 10 points per second left on the clock. Rewards rushing, which is the point.
     const bonus = 2000 * this.level + trunc(this.timer) * 10;
     this.completeMission(`MISSILE SITE DESTROYED!  BONUS ${bonus}`, bonus, 'bigboom');
+    return true;
   }
 
   updateBase(dt) {
@@ -1342,7 +1484,8 @@ if (typeof module !== 'undefined') {
     DIVER_WARNING, DIVER_AIM_LEAD, DIVER_LOCK_RANGE, LOW_FUEL_LEVEL,
     LOW_FUEL_RESET, LOW_FUEL_REPEAT, SALVAGE_DROP_CHANCE, SALVAGE_KINDS, UNSTABLE_FUSE, RAPID_FIRE_TIME,
     LEVEL_EVENTS, eventForLevel, SECONDARY_OBJECTIVES, secondaryForLevel,
-    Game, Alien, Laser, Missile, Item, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
+    COMMAND_FIRST_LEVEL, COMMAND_HP, COMMAND_CHARGE, COMMAND_EXPOSED, COMMAND_STAGGER, commandEncounterForLevel,
+    Game, Alien, Laser, Missile, Item, CommandVehicle, newInput, wrap, wdx, W, H, HUD, WORLD, HOME_X, GROUND };
 }
 
 </script>
@@ -2331,6 +2474,7 @@ function drawWorld(c, g, now) {
   drawDepot(c, g, now);
   for (const tp of g.tele) drawTeleporter(c, g, tp, now);
   drawBase(c, g, now);
+  drawCommandVehicle(c, g, now);
   for (const meteor of g.meteorWarnings) {
     const sx = gsx(g, meteor.x), gy = g.terr.surface(meteor.x);
     if (sx < -20 || sx > W + 20) continue;
@@ -2480,6 +2624,50 @@ function drawBase(c, g, now) {
   line(c, PALC.W, sx - ca, gy - 25, sx + ca, gy - 25);
 }
 
+function drawCommandVehicle(c, g, now) {
+  const v = g.commandVehicle;
+  if (!v) return;
+  if (v.state === 'charge' && v.targetX !== null) {
+    const tx = gsx(g, v.targetX), ty = g.terr.surface(v.targetX);
+    if (tx > -30 && tx < W + 30) {
+      const col = trunc(now * 14) % 2 ? PALC.R : PALC.Y;
+      line(c, col, tx - 9, ty - 2, tx + 9, ty - 2);
+      line(c, col, tx, ty - 12, tx, ty + 1);
+      for (let y = CEILING + 2; y < ty - 14; y += 7) P(c, PALC.R, tx, y);
+    }
+  }
+  const sx = gsx(g, v.x);
+  if (sx <= -50 || sx >= W + 50) return;
+  const gy = g.terr.base(v.x), damaged = v.phase === 2;
+  const body = damaged ? PALC.r : PALC.M, edge = damaged ? PALC.R : PALC.C;
+  R(c, PALC.K, sx - 18, gy - 5, 36, 5);
+  for (const wx of [-13, -5, 5, 13]) {
+    circ(c, PALC.w, sx + wx, gy - 3, 3, 0, true);
+    P(c, trunc(v.wheel + wx) % 2 ? PALC.W : PALC.K, sx + wx, gy - 3);
+  }
+  R(c, body, sx - 16, gy - 13, 32, 8);
+  strokeR(c, edge, sx - 16, gy - 13, 32, 8);
+  R(c, PALC.K, sx - 7, gy - 18, 14, 5);
+  line(c, edge, sx + v.dir * 2, gy - 17, sx + v.dir * 17, gy - 19, 2);
+  const core = v.state === 'exposed' ? (trunc(now * 12) % 2 ? PALC.W : PALC.C) : PALC.K;
+  R(c, core, sx - 3, gy - 12, 6, 5);
+  for (let i = 0; i < v.hp; i++) P(c, PALC.G, sx - 7 + i * 5, gy - 7);
+  if (v.shielded()) {
+    const shield = v.hitT > 0 ? PALC.W : (trunc(now * 8) % 2 ? PALC.C : PALC.c);
+    line(c, shield, sx - 22, gy - 16, sx - 22, gy - 8);
+    line(c, shield, sx - 22, gy - 16, sx - 17, gy - 21);
+    line(c, shield, sx + 22, gy - 16, sx + 22, gy - 8);
+    line(c, shield, sx + 22, gy - 16, sx + 17, gy - 21);
+  } else {
+    line(c, PALC.Y, sx - 6, gy - 22, sx, gy - 26);
+    line(c, PALC.Y, sx, gy - 26, sx + 6, gy - 22);
+  }
+  if (v.state === 'charge') {
+    const glow = trunc(now * 16) % 2 ? PALC.R : PALC.Y;
+    circ(c, glow, sx + v.dir * 18, gy - 19, 3, 1);
+  }
+}
+
 function drawRover(c, g, now) {
   const r = g.rover, sx = gsx(g, r.x);
   if (sx <= -70 || sx >= W + 70) return;
@@ -2594,6 +2782,7 @@ function drawHud(f, g, now, hiscore) {
   for (const tp of g.tele) R(f, PALC.C, px(tp) - 2, sy0 + 1, 4, 3);
   R(f, PALC.B, px(HOME_X) - 3, sy0 + 1, 6, 8);
   if (g.base.alive) R(f, trunc(now * 4) % 2 ? PALC.R : PALC.Y, px(g.base.x) - 4, sy0, 8, sh);
+  if (g.commandVehicle) R(f, PALC.M, px(g.commandVehicle.x) - 3, sy0 + 1, 7, 7);
   for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w, supply: PALC.C,
     repair: PALC.G, fuelcell: PALC.G, ammo: PALC.Y, unstable: PALC.M }[it.kind] || PALC.W, px(it.x) - 1, sy0 + 2, 3, 3);
   for (const a of g.aliens) R(f, PALC.M, px(a.x), sy0 + 3, 2, 2);
@@ -2620,6 +2809,12 @@ function drawHud(f, g, now, hiscore) {
     text(f, 18, `OPTIONAL ${g.secondary.name}: ${status}`, 20, 112,
       g.secondary.completed ? PALC.G : (g.secondary.failed ? PALC.r : PALC.C));
   }
+  if (g.commandVehicle) {
+    const v = g.commandVehicle;
+    const state = v.state === 'exposed' ? 'CORE EXPOSED' : (v.state === 'charge' ? 'STRIKE CHARGING' : 'SHIELDED');
+    text(f, 18, `COMMAND ${v.hp}/${v.hpMax}: ${state}`, 860, 90,
+      v.state === 'exposed' ? PALC.Y : (v.state === 'charge' ? PALC.R : PALC.C));
+  }
   if (r.blocked && g.p.inRover) {
     const instruction = r.bridges ? 'CRATER AHEAD — PRESS X TO LAY A BRIDGE' : 'CRATER AHEAD — NO BRIDGES';
     R(f, 'rgba(5,8,20,.82)', 330, 86, 620, 34);
@@ -2630,16 +2825,17 @@ function drawHud(f, g, now, hiscore) {
 
 function drawTelemetry(f, g) {
   const s = g.stats, p = S.pad;
-  R(f, 'rgba(5,8,20,.88)', 18, 128, 390, 194);
-  strokeR(f, PALC.C, 18, 128, 390, 194);
+  R(f, 'rgba(5,8,20,.88)', 18, 128, 410, 218);
+  strokeR(f, PALC.C, 18, 128, 410, 218);
   text(f, 18, 'FIELD TELEMETRY — F2 CLOSES', 34, 140, PALC.C);
   text(f, 16, `DIVER WARN ${s.diverTelegraphs}  LAUNCH ${s.diverLaunches}  CRASH ${s.diverCrashes}`, 34, 174, PALC.W);
   text(f, 16, `DIVER HITS ${s.diverPlayerHits}  ROVER BLOCKS ${s.roverBlockEvents}`, 34, 202, PALC.W);
   text(f, 16, `HERDS ${s.diverHerds}  GUARDS ${s.chaserGuards}  THEFTS ${s.cargoThefts}`, 34, 230, PALC.W);
   text(f, 16, `EVENTS ${s.eventsStarted}  METEORS ${s.meteorImpacts}  OPTIONAL ${s.secondaryCompleted}`, 34, 252, PALC.W);
   text(f, 16, `SALVAGE ${s.salvageRecovered}/${s.salvageDrops}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 274, PALC.W);
+  text(f, 16, `COMMAND ATTACKS ${s.commandAttacks}  HITS ${s.commandHits}  KILLS ${s.commandDestroyed}`, 34, 296, PALC.W);
   const active = p.activeIndex === null ? '-' : p.activeIndex;
-  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 296, PALC.Y);
+  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 318, PALC.Y);
 }
 
 const TITLE_LINES = [
@@ -2657,6 +2853,7 @@ const HOWTO = [
   'Rover refuels your jetpac. Aliens crashing make new craters!',
   'If the countdown ends, shoot down the missile chasing your rover.',
   'Enemy salvage can refuel, boost fire or explode while you carry it.',
+  'Later bomb runs add a shielded command vehicle. Move, then punish.',
 ];
 function drawTitle(f, now, hiscore) {
   R(f, 'rgba(0,0,10,0.59)', 0, 0, HI_W, HI_H);
@@ -3191,12 +3388,16 @@ function runSelftest(n) {
 function stageScene(level = 6) {
   const chosenLevel = Math.max(1, Math.min(6, trunc(level) || 6));
   const g = new Game(sfx, 2);
-  g.level = chosenLevel; g.timer = g.levelTime();
+  g.level = chosenLevel; g.placeBase(); g.startMission(); g.startLevelProgression(); g.timer = g.levelTime();
   S.g = g; S.state = 'play';
   for (let i = 0; i < 60; i++) g.update(1 / 60, newInput());
   const r = g.rover; r.x = wrap(g.base.x - 90);
   const bomb = g.items.find(i => i.kind === 'bomb'); r.cargo = bomb; bomb.state = 'trailer';
   g.p.x = wrap(g.base.x - 40); g.p.y = 110; g.p.onGround = false; g.cam = g.p.x;
+  if (g.commandVehicle) {
+    g.commandVehicle.state = 'charge'; g.commandVehicle.stateT = COMMAND_CHARGE * 0.7;
+    g.commandVehicle.targetX = wrap(g.p.x + 32);
+  }
   ['drifter', 'chaser', 'bouncer', 'diver', 'heavy', 'ufo'].forEach((k, i) => g.aliens.push(new Alien(k, wrap(g.cam - 140 + i * 52), 50 + (i % 2) * 40, 1, 0)));
   const stagedHeavy = g.aliens.find(a => a.kind === 'heavy');
   stagedHeavy.hp = 1; // persistent damaged frames

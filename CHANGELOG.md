@@ -1,5 +1,30 @@
 # Change log
 
+## v4.8.0-dev.4 — 15 November 2026
+
+Later bomb runs now include a mobile alien command vehicle. It protects the
+missile site, but it does not get a ceremonial health bar and permission to waste
+three minutes of everybody's evening.
+
+### Added
+
+- A four-core command vehicle on bomb missions from level four onwards. It patrols
+  the missile site and keeps the site shielded until destroyed.
+- A three-state attack cycle: a marked ground strike, a short exposed-core punish
+  window, then shield recovery. The second phase is visibly damaged and cycles
+  faster without shortening the warning into guesswork.
+- Original JavaScript-drawn vehicle, shield, exposed core, strike marker, scanner
+  contact, HUD status and telemetry counters.
+- Laser and rover-cannon collision, shield deflection, one-hit-per-opening stagger,
+  destruction bonus and recoverable bomb rejection while the site remains shielded.
+- Regression coverage for encounter gating, strike warning, punish timing, phase
+  change, site shielding, scoring, destruction and an ignored strike hitting Jetman.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.4`; it is not the final release.
+- Full release regression, final notes and packaging remain later work.
+
 ## v4.8.0-dev.3 — 6 November 2026
 
 This milestone adds predictable lunar disruptions and optional objectives. Events
