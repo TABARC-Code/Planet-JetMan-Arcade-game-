@@ -32,6 +32,16 @@ const ITEM_ART = {
   bridge: ['OOOOOOOOOOOOOO', 'OO.OO.OO.OO.OO', 'O.O..O..O..O.O', 'OOOOOOOOOOOOOO', 'ww..........ww'],
   cannon: ['........wwww', '......wwWWw.', '....wwWWw...', '..wWWWw.....',
     '.wWWWWWw....', 'wwwwwwwww...', '.K.....K....'],
+  supply: ['..CCCCCC..', '.CWWWWWWC.', 'CWWYYYYWWC', 'CWWYYYYWWC',
+    'CWWWWWWWWC', '.CCCCCCCC.', '..KK..KK..'],
+  repair: ['...OOOO...', '..OWWWWOO.', '.OWWCCWWO.', 'OWWCCCCWWO',
+    'OWWWCCWWWO', '.OOWWWWOO.', '..KKKKKK..'],
+  fuelcell: ['..GGGG..', '.GWWWWG.', 'GWWGGWWG', 'GWWGGWWG',
+    'GWWGGWWG', '.GWWWWG.', '..GGGG..'],
+  ammo: ['..YYYYYY..', '.YKKKKKKY.', 'YKKWYYWKKY', 'YKKWYYWKKY',
+    'YKKKKKKKKY', '.YYYYYYYY.', '..KK..KK..'],
+  unstable: ['....MM....', '..MMCCMM..', '.MCCWWCCM.', 'MCCWYYWCCM',
+    '.MCCWWCCM.', '..MMCCMM..', '....MM....'],
 };
 
 function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -307,6 +317,15 @@ function drawWorld(c, g, now) {
   drawDepot(c, g, now);
   for (const tp of g.tele) drawTeleporter(c, g, tp, now);
   drawBase(c, g, now);
+  drawCommandVehicle(c, g, now);
+  for (const meteor of g.meteorWarnings) {
+    const sx = gsx(g, meteor.x), gy = g.terr.surface(meteor.x);
+    if (sx < -20 || sx > W + 20) continue;
+    const col = trunc(now * 12) % 2 ? PALC.R : PALC.Y;
+    line(c, col, sx - 5, gy - 2, sx + 5, gy - 2);
+    line(c, col, sx, gy - 7, sx, gy + 2);
+    line(c, PALC.O, sx + 12, CEILING, sx + 2, Math.max(CEILING, gy - 16), 2);
+  }
   for (const it of g.items) if (it.state === 'ground' || it.state === 'fall') drawItem(c, g, it, 1);
   drawRover(c, g, now);
   const p = g.p;
@@ -337,6 +356,7 @@ function drawWorld(c, g, now) {
       const frames = bank[a.kind];
       const fr = frames[trunc(a.t * 8) % frames.length];
       c.drawImage(fr, sx - (fr.width >> 1), trunc(a.y) - (fr.height >> 1));
+      if (a.cargo) drawItem(c, g, a.cargo, 1);
     }
   }
   for (const m of g.missiles) {
@@ -407,11 +427,12 @@ function drawTeleporter(c, g, x, now) {
   const sx = gsx(g, x);
   if (sx <= -20 || sx >= W + 20) return;
   const gy = g.terr.base(x);
-  R(c, PALC.b, sx - 9, gy - 2, 18, 3);
-  R(c, PALC.C, sx - 7, gy - 3, 14, 1);
+  const offline = g.levelEventActive && g.levelEventActive('telefail');
+  R(c, offline ? PALC.r : PALC.b, sx - 9, gy - 2, 18, 3);
+  R(c, offline ? PALC.R : PALC.C, sx - 7, gy - 3, 14, 1);
   for (let k = 0; k < 4; k++) {
     const yy = gy - 4 - trunc(mod(now * 25 + k * 7, 28));
-    const col = k % 2 ? PALC.C : PALC.c;
+    const col = offline ? (k % 2 ? PALC.R : PALC.r) : (k % 2 ? PALC.C : PALC.c);
     P(c, col, sx - 6, yy); P(c, col, sx + 6, yy); P(c, PALC.W, sx, yy - 3);
   }
 }
@@ -446,6 +467,50 @@ function drawBase(c, g, now) {
   line(c, PALC.W, sx - ca, gy - 25, sx + ca, gy - 25);
 }
 
+function drawCommandVehicle(c, g, now) {
+  const v = g.commandVehicle;
+  if (!v) return;
+  if (v.state === 'charge' && v.targetX !== null) {
+    const tx = gsx(g, v.targetX), ty = g.terr.surface(v.targetX);
+    if (tx > -30 && tx < W + 30) {
+      const col = trunc(now * 14) % 2 ? PALC.R : PALC.Y;
+      line(c, col, tx - 9, ty - 2, tx + 9, ty - 2);
+      line(c, col, tx, ty - 12, tx, ty + 1);
+      for (let y = CEILING + 2; y < ty - 14; y += 7) P(c, PALC.R, tx, y);
+    }
+  }
+  const sx = gsx(g, v.x);
+  if (sx <= -50 || sx >= W + 50) return;
+  const gy = g.terr.base(v.x), damaged = v.phase === 2;
+  const body = damaged ? PALC.r : PALC.M, edge = damaged ? PALC.R : PALC.C;
+  R(c, PALC.K, sx - 18, gy - 5, 36, 5);
+  for (const wx of [-13, -5, 5, 13]) {
+    circ(c, PALC.w, sx + wx, gy - 3, 3, 0, true);
+    P(c, trunc(v.wheel + wx) % 2 ? PALC.W : PALC.K, sx + wx, gy - 3);
+  }
+  R(c, body, sx - 16, gy - 13, 32, 8);
+  strokeR(c, edge, sx - 16, gy - 13, 32, 8);
+  R(c, PALC.K, sx - 7, gy - 18, 14, 5);
+  line(c, edge, sx + v.dir * 2, gy - 17, sx + v.dir * 17, gy - 19, 2);
+  const core = v.state === 'exposed' ? (trunc(now * 12) % 2 ? PALC.W : PALC.C) : PALC.K;
+  R(c, core, sx - 3, gy - 12, 6, 5);
+  for (let i = 0; i < v.hp; i++) P(c, PALC.G, sx - 7 + i * 5, gy - 7);
+  if (v.shielded()) {
+    const shield = v.hitT > 0 ? PALC.W : (trunc(now * 8) % 2 ? PALC.C : PALC.c);
+    line(c, shield, sx - 22, gy - 16, sx - 22, gy - 8);
+    line(c, shield, sx - 22, gy - 16, sx - 17, gy - 21);
+    line(c, shield, sx + 22, gy - 16, sx + 22, gy - 8);
+    line(c, shield, sx + 22, gy - 16, sx + 17, gy - 21);
+  } else {
+    line(c, PALC.Y, sx - 6, gy - 22, sx, gy - 26);
+    line(c, PALC.Y, sx, gy - 26, sx + 6, gy - 22);
+  }
+  if (v.state === 'charge') {
+    const glow = trunc(now * 16) % 2 ? PALC.R : PALC.Y;
+    circ(c, glow, sx + v.dir * 18, gy - 19, 3, 1);
+  }
+}
+
 function drawRover(c, g, now) {
   const r = g.rover, sx = gsx(g, r.x);
   if (sx <= -70 || sx >= W + 70) return;
@@ -469,9 +534,10 @@ function drawRover(c, g, now) {
   R(c, PALC.B, tsx - 10, ty - 6, 20, 2);
   wheel(tsx - 7, ty - 3, r.wheel, 3);
   wheel(tsx + 7, ty - 3, r.wheel, 3);
-  if (r.cargo) {
-    const spr = art.item[r.cargo.kind + '_' + (r.cargo.kind === 'cannon' ? d : 1)];
-    c.drawImage(spr, tsx - (spr.width >> 1), ty - 9 - spr.height);
+  for (const [slot, cargo] of [r.cargo, r.cargo2].entries()) {
+    if (!cargo) continue;
+    const spr = art.item[cargo.kind + '_' + (cargo.kind === 'cannon' ? d : 1)];
+    c.drawImage(spr, tsx - (spr.width >> 1) + slot * d * 7, ty - 9 - spr.height - slot * 3);
   }
 
   for (const o of [-13, 0, 13]) {
@@ -531,20 +597,23 @@ function drawHud(f, g, now, hiscore) {
   text(f, 30, 'SCORE ' + pad(g.score, 6), 16, 4, PALC.Y);
   text(f, 30, 'HI ' + pad(Math.max(hiscore, g.score), 6), 330, 4, PALC.C);
   const look = levelLook(g);
-  text(f, 30, `LEVEL ${g.level} ${g.levelName ? g.levelName() : ''}`, 590, 4, look.accent);
+  text(f, 24, `L${g.level} ${g.mission ? g.mission.name : (g.levelName ? g.levelName() : '')}`, 590, 6, look.accent);
   f.imageSmoothingEnabled = false;
-  for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 780 + i * 28, 4, 22, 27);
+  for (let i = 0; i < Math.min(g.lives, 8); i++) f.drawImage(art.jet.stand_1, 820 + i * 22, 5, 18, 22);
   text(f, 30, 'EARTH', 1040, 4, PALC.B);
   for (let i = 0; i < 3; i++) R(f, i < g.earthHits ? PALC.R : PALC.G, 1150 + i * 38, 10, 30, 18);
   text(f, 22, 'FUEL', 16, 40, PALC.W);
   R(f, 'rgb(60,60,70)', 78, 43, 200, 18);
-  R(f, g.p.fuel > 35 ? PALC.G : (g.p.fuel > 15 ? PALC.Y : PALC.R), 78, 43, trunc(2 * g.p.fuel), 18);
+  const fuelRatio = Math.max(0, Math.min(1, g.p.fuel / (g.fuelCapacity || 100)));
+  R(f, fuelRatio > 0.35 ? PALC.G : (fuelRatio > 0.15 ? PALC.Y : PALC.R), 78, 43, trunc(200 * fuelRatio), 18);
   if (g.base.alive) {
     text(f, 22, 'BASE COUNTDOWN ' + pad(g.timer, 3), 300, 40, g.timer < 15 && trunc(now * 4) % 2 ? PALC.R : PALC.W);
   } else text(f, 22, 'BASE DESTROYED', 300, 40, PALC.G);
   const r = g.rover;
-  text(f, 22, `ROVER BRIDGES ${r.bridges}  TRAILER ${r.cargo ? r.cargo.kind.toUpperCase() : 'EMPTY'}`, 590, 40, PALC.O);
-  text(f, 22, 'CARRYING ' + (g.p.carry ? g.p.carry.kind.toUpperCase() : '-'), 1040, 40, PALC.W);
+  const cargo = [r.cargo, r.cargo2].filter(Boolean).map(it => it.kind.toUpperCase()).join('+') || 'EMPTY';
+  text(f, 22, `ROVER ${r.disabled ? 'DISABLED' : 'READY'}  BRIDGES ${r.bridges}  CARGO ${cargo}`, 590, 40, r.disabled ? PALC.R : PALC.O);
+  const rapid = g.p.rapidT > 0 ? `  RAPID ${Math.ceil(g.p.rapidT)}` : '';
+  text(f, 22, 'CARRYING ' + (g.p.carry ? g.p.carry.kind.toUpperCase() : '-') + rapid, 1040, 40, g.p.rapidT > 0 ? PALC.Y : PALC.W);
   // scanner: whole moon in one strip, centred on the camera
   const sx0 = 16, sy0 = 66, sw = HI_W - 32, sh = 10;
   R(f, 'rgb(20,20,40)', sx0, sy0, sw, sh);
@@ -556,14 +625,38 @@ function drawHud(f, g, now, hiscore) {
   for (const tp of g.tele) R(f, PALC.C, px(tp) - 2, sy0 + 1, 4, 3);
   R(f, PALC.B, px(HOME_X) - 3, sy0 + 1, 6, 8);
   if (g.base.alive) R(f, trunc(now * 4) % 2 ? PALC.R : PALC.Y, px(g.base.x) - 4, sy0, 8, sh);
-  for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w }[it.kind], px(it.x) - 1, sy0 + 2, 3, 3);
+  if (g.commandVehicle) R(f, PALC.M, px(g.commandVehicle.x) - 3, sy0 + 1, 7, 7);
+  for (const it of g.items) R(f, { bomb: PALC.Y, bridge: PALC.O, cannon: PALC.w, supply: PALC.C,
+    repair: PALC.G, fuelcell: PALC.G, ammo: PALC.Y, unstable: PALC.M }[it.kind] || PALC.W, px(it.x) - 1, sy0 + 2, 3, 3);
   for (const a of g.aliens) R(f, PALC.M, px(a.x), sy0 + 3, 2, 2);
   for (const m of g.missiles) R(f, PALC.R, px(m.x) - 2, sy0 + 1, 4, 8);
   R(f, PALC.W, px(g.rover.x) - 3, sy0 + 3, 7, 5);
   if (!g.p.inRover) R(f, PALC.C, px(g.p.x) - 1, sy0 + 1, 3, 8);
-  if (g.base.alive) {
-    const d = wdx(g.base.x, g.cam);
-    if (Math.abs(d) > W / 2) text(f, 22, d > 0 ? 'BASE >>' : '<< BASE', d > 0 ? HI_W - 150 : 20, 90, PALC.R);
+  if (g.mission && !g.mission.completed) {
+    const d = wdx(g.missionTargetX(), g.cam);
+    if (Math.abs(d) > W / 2) text(f, 22, d > 0 ? 'OBJECTIVE >>' : '<< OBJECTIVE', d > 0 ? HI_W - 210 : 20, 134, PALC.Y);
+  }
+  if (g.levelEvent) {
+    const eventState = g.levelEvent.active ? `${g.levelEvent.name} ${Math.ceil(g.levelEvent.t)}` : `${g.levelEvent.name} IN ${Math.ceil(g.levelEvent.next)}`;
+    text(f, 18, eventState, 20, 90, g.levelEvent.active ? PALC.R : PALC.w);
+    if (g.levelEventActive('solar') && trunc(now * 10) % 3 === 0) {
+      for (let x = sx0 + 2; x < sx0 + sw - 2; x += 18) R(f, 'rgba(5,5,15,.9)', x, sy0 + 1, 10, sh - 2);
+    }
+  }
+  if (g.secondary) {
+    let status;
+    if (g.secondary.completed) status = 'COMPLETE';
+    else if (g.secondary.failed) status = 'MISSED';
+    else if (g.secondary.id === 'quick') status = `KEEP ${g.secondary.target}S`;
+    else status = `${g.secondary.progress}/${g.secondary.target}`;
+    text(f, 18, `OPTIONAL ${g.secondary.name}: ${status}`, 20, 112,
+      g.secondary.completed ? PALC.G : (g.secondary.failed ? PALC.r : PALC.C));
+  }
+  if (g.commandVehicle) {
+    const v = g.commandVehicle;
+    const state = v.state === 'exposed' ? 'CORE EXPOSED' : (v.state === 'charge' ? 'STRIKE CHARGING' : 'SHIELDED');
+    text(f, 18, `COMMAND ${v.hp}/${v.hpMax}: ${state}`, 860, 90,
+      v.state === 'exposed' ? PALC.Y : (v.state === 'charge' ? PALC.R : PALC.C));
   }
   if (r.blocked && g.p.inRover) {
     const instruction = r.bridges ? 'CRATER AHEAD — PRESS X TO LAY A BRIDGE' : 'CRATER AHEAD — NO BRIDGES';
@@ -575,14 +668,17 @@ function drawHud(f, g, now, hiscore) {
 
 function drawTelemetry(f, g) {
   const s = g.stats, p = S.pad;
-  R(f, 'rgba(5,8,20,.88)', 18, 128, 360, 150);
-  strokeR(f, PALC.C, 18, 128, 360, 150);
+  R(f, 'rgba(5,8,20,.88)', 18, 128, 410, 218);
+  strokeR(f, PALC.C, 18, 128, 410, 218);
   text(f, 18, 'FIELD TELEMETRY — F2 CLOSES', 34, 140, PALC.C);
   text(f, 16, `DIVER WARN ${s.diverTelegraphs}  LAUNCH ${s.diverLaunches}  CRASH ${s.diverCrashes}`, 34, 174, PALC.W);
   text(f, 16, `DIVER HITS ${s.diverPlayerHits}  ROVER BLOCKS ${s.roverBlockEvents}`, 34, 202, PALC.W);
-  text(f, 16, `BRIDGES LAID ${s.roverBridgesLaid}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 230, PALC.W);
+  text(f, 16, `HERDS ${s.diverHerds}  GUARDS ${s.chaserGuards}  THEFTS ${s.cargoThefts}`, 34, 230, PALC.W);
+  text(f, 16, `EVENTS ${s.eventsStarted}  METEORS ${s.meteorImpacts}  OPTIONAL ${s.secondaryCompleted}`, 34, 252, PALC.W);
+  text(f, 16, `SALVAGE ${s.salvageRecovered}/${s.salvageDrops}  LEVEL SHIFTS ${s.levelTransitions}`, 34, 274, PALC.W);
+  text(f, 16, `COMMAND ATTACKS ${s.commandAttacks}  HITS ${s.commandHits}  KILLS ${s.commandDestroyed}`, 34, 296, PALC.W);
   const active = p.activeIndex === null ? '-' : p.activeIndex;
-  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 258, PALC.Y);
+  text(f, 16, `PADS ${p.connectedCount}  ACTIVE ${active}  WAITING ${p.waitingNeutral.length}`, 34, 318, PALC.Y);
 }
 
 const TITLE_LINES = [
@@ -594,11 +690,13 @@ const TITLE_LINES = [
   ['P  M  N  B  F  F2  F3  ESC', 'PAUSE  MUTE  MUSIC  AMBIENCE  FULLSCREEN  DATA  PAD SETUP  TITLE'],
 ];
 const HOWTO = [
-  'Carry the BOMB to the alien base and drop it from ABOVE.',
+  'Rotating missions: bomb run, supply recovery and rover repair.',
   "Drop items on the rover's trailer to haul them. Kits = bridges.",
   'Rover cannot cross craters: drop a bridge kit in, or press X.',
   'Rover refuels your jetpac. Aliens crashing make new craters!',
   'If the countdown ends, shoot down the missile chasing your rover.',
+  'Enemy salvage can refuel, boost fire or explode while you carry it.',
+  'Later bomb runs add a shielded command vehicle. Move, then punish.',
 ];
 function drawTitle(f, now, hiscore) {
   R(f, 'rgba(0,0,10,0.59)', 0, 0, HI_W, HI_H);
@@ -608,8 +706,12 @@ function drawTitle(f, now, hiscore) {
   let y = 240;
   for (const [k, v] of TITLE_LINES) { text(f, 22, k, 260, y, PALC.Y); text(f, 22, v, 560, y, PALC.W); y += 32; }
   y += 16;
-  for (const l of HOWTO) { text(f, 22, l, HI_W / 2, y, 'rgb(190,190,220)', true); y += 30; }
-  if (trunc(now * 2) % 2) text(f, 30, touchMode ? 'TAP FIRE TO START' : 'PRESS FIRE TO START', HI_W / 2, 680, PALC.G, true);
+  for (const l of HOWTO) { text(f, 22, l, HI_W / 2, y, 'rgb(190,190,220)', true); y += 26; }
+  const loadout = LOADOUTS[S.loadoutIndex];
+  text(f, 22, `LOADOUT ${S.loadoutIndex + 1}/4: ${loadout.name} — ${loadout.detail}`, HI_W / 2, 620, PALC.Y, true);
+  text(f, 20, `LEFT/RIGHT OR 1-4 SELECT  •  UP/DOWN OR T: ${S.classic ? 'CLASSIC — THREE LIVES, FASTER WAVES, NO KIT RESCUE' : 'ARCADE — FOUR LIVES, DEPOT KIT RESCUE'}`,
+    HI_W / 2, 650, S.classic ? PALC.R : PALC.G, true);
+  if (trunc(now * 2) % 2) text(f, 30, touchMode ? 'TAP FIRE TO START' : 'PRESS FIRE TO START', HI_W / 2, 688, PALC.G, true);
   text(f, 22, 'HI-SCORE ' + pad(hiscore, 6), HI_W / 2, 735, PALC.C, true);
   text(f, 16, `VERSION ${VERSION}  -  ART & SOUND CREDITS: SEE CREDITS`, HI_W / 2, 770, 'rgb(120,120,150)', true, false);
 }
@@ -819,6 +921,8 @@ function pollInput(inp) {
   inp.right = !suppressFrame && (has('right') || pad.held.right);
   inp.up = !suppressFrame && (has('up') || pad.held.up);
   inp.fire = !suppressFrame && (has('fire') || pad.held.fire);
+  inp.left_p = !suppressFrame && (edges.has('left') || pad.pressed.left);
+  inp.right_p = !suppressFrame && (edges.has('right') || pad.pressed.right);
   inp.up_p = !suppressFrame && (edges.has('up') || pad.pressed.up);
   inp.down_p = !suppressFrame && (edges.has('down') || pad.pressed.down);
   inp.pick_p = !suppressFrame && (edges.has('pick') || pad.pressed.pick);
@@ -853,6 +957,7 @@ function toggleFullscreen() {
 }
 
 const S = { state: 'title', demo: null, g: null, overT: 0, now: 0, hiscore: loadHi(), inp: newInput(),
+  loadoutIndex: 1, classic: false,
   notice: null, lostPad: null, showTelemetry: false,
   pad: { activeIndex: null, connectedCount: 0, waitingNeutral: [] } };
 
@@ -959,6 +1064,8 @@ window.addEventListener('keydown', e => {
   if (a) e.preventDefault();
   if (!e.repeat) {
     if (a) edges.add(a);
+    if (S.state === 'title' && /^Digit[1-4]$/.test(e.code)) S.loadoutIndex = Number(e.code.slice(-1)) - 1;
+    if (S.state === 'title' && e.code === 'KeyT') S.classic = !S.classic;
     if (e.code === 'KeyP') edges.add('pause');
     if (e.code === 'KeyM') sfx.setMuted(!sfx.muted);
     if (e.code === 'KeyN') { sfx.musicOn = !sfx.musicOn; sfx.setMusic(S.state === 'pause'); }
@@ -1015,8 +1122,11 @@ function step(dt) {
   if (S.state === 'title') {
     S.demo.cam = wrap(S.demo.cam + 30 * dt);
     S.demo.base.t += dt;
+    if (inp.left_p || inp.right_p) S.loadoutIndex = mod(S.loadoutIndex + (inp.right_p ? 1 : -1), LOADOUTS.length);
+    if (inp.up_p || inp.down_p) S.classic = !S.classic;
     if (inp.fire_p || inp.pick_p) {
-      S.g = new Game(sfx); S.state = 'play'; sfx.setPaused(false);
+      S.g = new Game(sfx, undefined, { loadout: LOADOUTS[S.loadoutIndex].id, classic: S.classic });
+      S.state = 'play'; sfx.setPaused(false);
       sfx.setAmbience(S.g.profile().theme, false); sfx.play('start');
     }
   } else if (S.state === 'play') {
@@ -1121,12 +1231,16 @@ function runSelftest(n) {
 function stageScene(level = 6) {
   const chosenLevel = Math.max(1, Math.min(6, trunc(level) || 6));
   const g = new Game(sfx, 2);
-  g.level = chosenLevel; g.timer = g.levelTime();
+  g.level = chosenLevel; g.placeBase(); g.startMission(); g.startLevelProgression(); g.timer = g.levelTime();
   S.g = g; S.state = 'play';
   for (let i = 0; i < 60; i++) g.update(1 / 60, newInput());
   const r = g.rover; r.x = wrap(g.base.x - 90);
   const bomb = g.items.find(i => i.kind === 'bomb'); r.cargo = bomb; bomb.state = 'trailer';
   g.p.x = wrap(g.base.x - 40); g.p.y = 110; g.p.onGround = false; g.cam = g.p.x;
+  if (g.commandVehicle) {
+    g.commandVehicle.state = 'charge'; g.commandVehicle.stateT = COMMAND_CHARGE * 0.7;
+    g.commandVehicle.targetX = wrap(g.p.x + 32);
+  }
   ['drifter', 'chaser', 'bouncer', 'diver', 'heavy', 'ufo'].forEach((k, i) => g.aliens.push(new Alien(k, wrap(g.cam - 140 + i * 52), 50 + (i % 2) * 40, 1, 0)));
   const stagedHeavy = g.aliens.find(a => a.kind === 'heavy');
   stagedHeavy.hp = 1; // persistent damaged frames

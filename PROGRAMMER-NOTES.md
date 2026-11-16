@@ -1,10 +1,93 @@
-# Programmer notes — browser 4.7.0
+# Programmer notes — browser 4.8.0
+
+The release pass pulled the four milestones into one build and then made them earn
+the number. I preserved the later page metadata from `main`, repaired its doubled
+angle bracket and rebuilt from source. A search description is useful. A malformed
+head element is more avant-garde than the browser really needs.
+
+The packages now come from explicit lists with fixed archive timestamps and their
+own manifests. Both can be extracted and checked without trusting the ZIP merely
+because it looks pleasantly final. Physical controller testing is still stated as
+unverified; a deterministic pad model is evidence, not a USB socket.
+
+Future ideas: let UFOs occasionally contest salvage around the command vehicle,
+add a brief rover recoil frame, and explore a fourth mission which uses the level
+events rather than piling another icon onto the HUD.
+
+## v4.8.0-dev.4 notes
+
+For dev.4 I made the command vehicle an encounter rather than a large numerical
+complaint. It marks the ground, fires, drops its shield and offers one clean punish
+window. Four successful reads destroy it. At half strength the body turns ragged
+red and the cycle accelerates, but the warning remains a warning rather than a
+posthumous explanation.
+
+The vehicle protects later bomb sites, so the old delivery loop now has a sharp
+combat interruption without becoming a separate boss game. A premature bomb is
+pushed clear and remains recoverable. Deleting the mission item would have been
+very tough, admittedly, though chiefly on the player's opinion of the programmer.
+
+I kept the collision boxes tied to what the drawing says: a broad vehicle core,
+a visible ground marker and one hit per exposed phase. The final release pass still
+needs the complete regression, package extraction checks and accurate release notes.
+
+## v4.8.0-dev.3 notes
+
+For dev.3 I added four disruptions, but kept them legible. Solar static breaks the
+scanner rather than the controls. Teleporter outages turn both pads red. Meteors
+paint the ground before arriving, and low gravity changes the actual simulation —
+Jetman, loose equipment and bouncers — instead of merely adding a jaunty caption.
+
+The optional jobs are deliberately small: four aliens, one recovered salvage item,
+or thirty seconds left on the clock. They pay 500 points per level and never hold
+the main mission hostage. An optional objective which becomes compulsory has
+simply acquired a false moustache.
+
+The next pass was the mobile command vehicle encounter, followed by the full release
+regression and packaging work. That encounter needed proper phases and readable
+counterplay; a large health bar with wheels would have been cheaper, but not better.
+
+## v4.8.0-dev.2 notes
+
+For dev.2 I stopped treating each alien as a private contractor. Divers now use a
+nearby heavy to close the comfortable escape lane, chasers screen the missile site,
+and UFOs collect loose cargo. A carrier which gets away relocates the item instead
+of deleting the mission. Malice is acceptable; a soft lock is merely paperwork.
+
+Salvage is deliberately uneven. Fuel and laser cells are quick practical wins.
+Unstable technology is worth 1,000 points at the rover, but its nine-second fuse
+keeps running in Jetman's hands and under a UFO. The player can ignore it. That
+choice matters more than another automatic upgrade staircase.
+
+The rules, original pixel sprites, HUD, scanner and deterministic checks moved
+together. No collision boxes changed. Next I want level events and optional
+objectives, with enough warning that difficulty still feels old-school rather
+than arbitrary.
+
+## v4.8.0-dev.1 notes
+
+The first pass rotates three jobs rather than merely repainting the bomb run. The
+supply crate has to return on the trailer; the repair module must be carried back
+to a rover which, for once, is genuinely broken rather than displaying a stern
+message and carrying on regardless.
+
+I made the loadouts lateral choices. The cannon gives immediate teeth, bridge
+reserve buys route freedom, fuel reserve extends Jetman's reach, and the cargo rack
+hauls two items. None secretly includes the others. Classic mode then removes a
+life, shortens the clock, thickens the waves and stops the depot quietly replacing
+lost bridge kits. It is severe, but every threat still uses the existing warnings.
+
+The enemy pairings and salvage drops moved into dev.2 after their own regression
+pass. Coordinated aliens still aren't allowed to form a committee devoted to
+sitting on Jetman.
+
+## v4.7.0 notes
 
 For 4.7.0 I replaced the two silhouettes that still looked like placeholders.
 Jetman now has one shared 17-pixel body across idle, two walking strides and flight,
 so his visor, pack and chest panel stay attached to the same person. The rover now
 has a properly outlined chassis, three articulated wheel positions, a readable cab
-and a trailer which appears engineered rather than mildly embarrassed. (it was 4am it looked good at the time.)
+and a trailer which appears engineered rather than mildly embarrassed.
 
 I reviewed two CC0 platformer sheets for scale and pose rhythm, then kept their
 pixels out of the build. The result is original project art, fixed to the existing
@@ -14,18 +97,19 @@ The audio system grew up at the same time. Effects and ambience now use separate
 buses, a 16-voice priority limit and short warning ducking. Six level beds provide
 radio hiss, relay chatter and low machinery without inventing lunar weather. Heavy
 damage, missile launch and level transition each gained their own cue. Everything
-is still generated in JavaScript. (I hate those no uploads of wav file sites.)
+is still generated in JavaScript.
 
 Future ideas: a boarding animation, cannon recoil and a rover damage state. I have
 left them out until the new scale has survived ordinary play; enthusiasm remains a
-poor substitute for collision testing. maybe
+poor substitute for collision testing.
 
 ## v4.6.0 notes
 
 For 4.6.0 I turned the difficulty curve into six named profiles. The same moon now
 develops a recognisable geography: Dust Plain rocks, Static Valley aerials, Crater
 Belt crystals, Red Terminator pylons, Iron Waste girders and Black Sky obelisks.
-They are deliberately decorative. fixed a couple of bugs.
+They are deliberately decorative. A scenic rock which stops the rover is merely a
+bug wearing a small hat.
 
 The controller panel exposes the thresholds that used to be constants. I kept the
 old values as defaults, split upward thrust from downward boarding, and added a
@@ -55,7 +139,7 @@ stubborn second on the accelerator becomes sixty alleged design disasters.
 F2 exposes those figures locally. They are deliberately plain counters, with no
 network, persistent identifier or analytics theatre. I also repaired release
 provenance and wrote a browser-only package guide after noticing that the previous
-README advertised several files the ZIP did not contain. No idea, sure felt real at the time. 
+README advertised several files the ZIP did not contain.
 
 The controller-settings proposal—dead-zone hysteresis, accessible diagnostics and
 optional rumble—belongs in its own release. It touches persistence, menu focus and
@@ -64,7 +148,7 @@ credible. I have left that as an idea for a later release.
 
 ## Controller recovery implementation notes
 
-I started with the files, not the stuff I thought was real. (ADHD,). The available project was a plain
+I started with the files, not the folklore. The available project was a plain
 folder rather than a repository, and its browser source had no reliable embedded
 release marker. The project owner subsequently supplied the v4.4.0 release record.
 That makes controller recovery, proper damaged sprites and audio warnings v4.5.0
@@ -83,7 +167,8 @@ the single-file build still carries everything it needs.
 
 For sound, I kept the countdown pip and made a separate descending double warning.
 It now marks low fuel and an active controller loss. Enemy damage keeps its blunt
-hit sound; mixing every alert into the same siren would be kind of efficient in the same way a smoke alarm wired to the doorbell is efficient.( note to self move smoke alarm.)
+hit sound; mixing every alert into the same siren would be efficient in the way a
+smoke alarm wired to the doorbell is efficient.
 
 Future ideas I deliberately left on the bench: light controller rumble for a
 surviving heavy, a small settings panel for dead zones and volume, and an on-screen

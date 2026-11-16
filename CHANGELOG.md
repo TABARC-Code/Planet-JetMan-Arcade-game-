@@ -1,5 +1,135 @@
 # Change log
 
+## v4.8.0 — 16 November 2026
+
+This release turns the four tested 4.8 development milestones into one verified
+browser and source release. The structure is broader, but the game remains a fast,
+hostile arcade run rather than a lunar administration simulator.
+
+### Added
+
+- Three rotating mission types and four mutually exclusive rover loadouts.
+- Classic mode with fewer lives, tighter deadlines, denser waves, tougher missiles
+  and no automatic replacement bridge kits.
+- Coordinated diver, heavy, chaser and UFO behaviours, plus three salvage types.
+- Four readable level events and three optional score objectives.
+- A four-core mobile command vehicle with marked strikes, exposed counterattack
+  windows, a faster damaged phase and recoverable bomb rejection.
+- Deterministic browser and source packaging tools with per-archive manifests.
+
+### Changed
+
+- Preserved the later page metadata from `main` and corrected its malformed head
+  element before rebuilding the single-file game.
+- The displayed version and package identity now read `4.8.0`.
+
+### Verification
+
+- Full mechanics, input, art and generated-audio suites passed.
+- JavaScript and Python syntax checks passed.
+- The single-file build, browser interaction, long soak, extracted manifests and
+  extracted-source rebuild were checked for this release.
+- Physical-controller testing remains unverified.
+
+## v4.8.0-dev.4 — 15 November 2026
+
+Later bomb runs now include a mobile alien command vehicle. It protects the
+missile site, but it does not get a ceremonial health bar and permission to waste
+three minutes of everybody's evening.
+
+### Added
+
+- A four-core command vehicle on bomb missions from level four onwards. It patrols
+  the missile site and keeps the site shielded until destroyed.
+- A three-state attack cycle: a marked ground strike, a short exposed-core punish
+  window, then shield recovery. The second phase is visibly damaged and cycles
+  faster without shortening the warning into guesswork.
+- Original JavaScript-drawn vehicle, shield, exposed core, strike marker, scanner
+  contact, HUD status and telemetry counters.
+- Laser and rover-cannon collision, shield deflection, one-hit-per-opening stagger,
+  destruction bonus and recoverable bomb rejection while the site remains shielded.
+- Regression coverage for encounter gating, strike warning, punish timing, phase
+  change, site shielding, scoring, destruction and an ignored strike hitting Jetman.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.4`; it is not the final release.
+- Full release regression, final notes and packaging remain later work.
+
+## v4.8.0-dev.3 — 6 November 2026
+
+This milestone adds predictable lunar disruptions and optional objectives. Events
+change the playfield without quietly changing the rules underneath the player.
+
+### Added
+
+- Four rotating level events: solar interference disrupts the scanner, teleporter
+  outages disable both pads, meteor fronts mark impacts before cutting new craters,
+  and low-gravity surges alter Jetman, loose-item and bouncer physics.
+- Three rotating optional objectives: destroy four aliens, recover one salvage
+  item, or complete the primary mission with at least 30 seconds remaining.
+- Level-scaled 500-point optional bonuses, clear completion/missed states and
+  short briefing, HUD and telemetry feedback.
+- Red outage art for teleporter pads, pulsing meteor impact markers and solar
+  static drawn with the existing JavaScript renderer.
+- Regression coverage for event rotation and recovery, real low-gravity physics,
+  meteor craters, all optional-objective paths and missed objectives.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.3`; it is not the final release.
+- A major encounter, full release regression and final packaging remain later work.
+
+## v4.8.0-dev.2 — 5 November 2026
+
+This milestone gives existing enemies jobs to do together and adds salvage which
+can help, distract or detonate. The final 4.8.0 release is still in development.
+
+### Added
+
+- Divers use nearby heavies to threaten the clear side of Jetman, making the
+  heavy's side the obvious — and unpleasant — escape route.
+- Chasers screen active missile sites during bomb runs, then break formation when
+  Jetman enters the interception area.
+- UFOs can lift unattended mission cargo and salvage. Shooting the carrier drops
+  its load; an escaping UFO relocates it rather than making a mission unwinnable.
+- Enemy kills have a 24% salvage chance. Fuel cells restore fuel, laser cells give
+  ten seconds of rapid fire, and unstable technology awards 1,000 points if it
+  reaches the rover before its nine-second fuse expires.
+- Original JavaScript pixel sprites, scanner colours, HUD feedback and session
+  counters for the three salvage types and coordinated enemy actions.
+- Regression coverage for herding aim, site defence, cargo theft and recovery,
+  salvage rewards, rapid fire, unstable detonation and the drop gate.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.2`; it is not the final release.
+- Level events, secondary objectives, progression and a major encounter remain
+  later work on the release branch.
+
+## v4.8.0-dev.1 — 1 November 2026
+
+This development milestone adds the first new mission structure without pretending
+the full 4.8.0 release is finished.
+
+### Added
+
+- Three rotating jobs: bomb run, stranded-supply recovery and emergency rover repair.
+- Four mutually exclusive rover loadouts: cannon, bridge reserve, fuel reserve or
+  a two-slot cargo rack.
+- A selectable Classic mode with three lives, shorter deadlines, faster and denser
+  waves, tougher missiles and no automatic replacement bridge kits.
+- New original supply-crate and repair-module sprites, objective scanner markers
+  and mission-specific HUD messages.
+- Regression coverage for mission order and completion, every loadout trade-off and
+  the removal of the bridge-kit safety net in Classic mode.
+
+### Development status
+
+- The display identifies this build as `4.8.0-dev.1`; it is not the final release.
+- Enemy combinations, salvage, level events, secondary objectives and major
+  encounters remain later work.
+
 ## v4.7.0 — 28 October 2026
 
 This release completes the JavaScript audio pass and replaces the remaining

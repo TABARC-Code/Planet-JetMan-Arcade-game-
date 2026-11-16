@@ -2,10 +2,13 @@
 // If these pass and the Python ones pass, the two copies probably still agree. Probably.
 'use strict';
 const L = require('../web/game.js');
-const { Game, Alien, Missile, LEVEL_PROFILES, levelProfile, newInput, wrap, wdx } = L;
+const { Game, Alien, Missile, LEVEL_PROFILES, levelProfile, MISSION_TYPES, missionForLevel,
+  LOADOUTS, LEVEL_EVENTS, eventForLevel, SECONDARY_OBJECTIVES, secondaryForLevel,
+  COMMAND_FIRST_LEVEL, COMMAND_HP, COMMAND_CHARGE, commandEncounterForLevel,
+  newInput, wrap, wdx } = L;
 const assert = (c, m) => { if (!c) { console.error('FAIL:', m); process.exit(1); } };
 
-const G = () => { const g = new Game(null, 5); g.spawnT = 1e9; return g; };
+const G = (options = {}) => { const g = new Game(null, 5, options); g.spawnT = 1e9; return g; };
 function run(g, n, keys = {}) {
   const inp = newInput();
   for (let f = 0; f < n; f++) {
@@ -25,6 +28,29 @@ assert(levelProfile(7).time === 75 && levelProfile(7).maxAliens === 9 && levelPr
   'post-profile escalation preserves the established limits');
 console.log('level profiles ok');
 
+assert(MISSION_TYPES.length === 3 && missionForLevel(1).id === 'bomb'
+  && missionForLevel(2).id === 'supply' && missionForLevel(3).id === 'repair'
+  && missionForLevel(4).id === 'bomb', 'three missions rotate by level');
+assert(LOADOUTS.length === 4, 'four rover loadouts');
+let load = G({ loadout: 'cannon' });
+assert(load.hasCargo('cannon') && load.rover.bridges === 2 && load.rover.cargoCapacity === 1,
+  'cannon loadout trades cargo space for immediate firepower');
+load = G({ loadout: 'bridge' });
+assert(!load.hasCargo('cannon') && load.rover.bridges === 4, 'bridge reserve starts with four kits');
+load = G({ loadout: 'fuel' });
+assert(load.fuelCapacity === 135 && load.p.fuel === 135 && load.rover.bridges === 2,
+  'fuel reserve extends range without adding weapons');
+load = G({ loadout: 'cargo' });
+const extraA = new L.Item('supply', 10, 10), extraB = new L.Item('cannon', 10, 10);
+assert(load.stowCargo(extraA) && load.stowCargo(extraB) && load.cargoCount() === 2,
+  'cargo rack holds two items and nothing else is quietly upgraded');
+let hard = G({ loadout: 'bridge', classic: true });
+assert(hard.lives === 3 && hard.levelTime() === 128 && hard.maxAliens() === 4
+  && hard.spawnDelay() < levelProfile(1).spawn, 'classic mode is faster and starts one life down');
+hard.items = hard.items.filter(it => it.kind !== 'bridge'); hard.timer = 1e9;
+run(hard, 1000); assert(!hard.items.some(it => it.kind === 'bridge'), 'classic mode has no depot kit rescue');
+console.log('missions, loadouts and classic mode ok');
+
 let g = G(), p = g.p;
 const levelHeard = []; g.sfx = { play: name => levelHeard.push(name), loop() {}, stopLoops() {} };
 const bomb = g.items.find(i => i.kind === 'bomb');
@@ -38,6 +64,19 @@ assert(g.stats.levelTransitions === 1, 'level transition counted once');
 assert(levelHeard.filter(n => n === 'levelup').length === 1, 'level transition has one stinger');
 console.log('bomb ok');
 
+g = G({ loadout: 'cargo' }); g.level = 2; g.placeBase(); g.startMission(); g.timer = 90;
+const supply = g.items.find(i => i.kind === 'supply');
+assert(supply && g.mission.id === 'supply', 'supply recovery creates one stranded crate');
+g.stowCargo(supply); g.rover.x = L.HOME_X; g.updateMission();
+assert(g.mission.completed && !g.base.alive && !g.hasCargo('supply'), 'supply mission completes only at the depot');
+
+g = G({ loadout: 'bridge' }); g.level = 3; g.placeBase(); g.startMission(); g.timer = 90;
+const repair = g.items.find(i => i.kind === 'repair');
+assert(repair && g.rover.disabled && g.mission.id === 'repair', 'repair mission starts with a disabled rover');
+g.p.carry = repair; repair.state = 'held'; g.enterRover();
+assert(!g.rover.disabled && g.mission.completed && !g.p.inRover, 'repair module restores the rover and completes the job');
+console.log('rotating mission completion ok');
+
 g = G(); p = g.p; let c = g.terr.craters[0];
 const kit = g.items.find(i => i.kind === 'bridge');
 run(g, 120); p.carry = kit; kit.state = 'held'; p.x = c.x; p.y = 60; p.onGround = false;
@@ -45,11 +84,12 @@ run(g, 1, { pick_p: true }); run(g, 90); assert(c.bridged, 'kit bridges crater')
 
 g = G(); p = g.p; let r = g.rover; c = g.terr.craters[1];
 r.x = wrap(c.x - c.r - 40); r.dir = 1; p.inRover = true;
+const bridgeStock = r.bridges;
 for (let f = 0; f < 300 && g.stats.roverBlockEvents === 0; f++) run(g, 1, { right: true });
 assert(r.blocked === c, 'rover blocked');
 assert(g.stats.roverBlockEvents === 1 && r.blockedPulse > 0, 'rover blockage counted once with pulse');
 run(g, 60, { right: true }); assert(g.stats.roverBlockEvents === 1, 'held drive does not repeat blockage event');
-run(g, 1, { pick_p: true }); assert(c.bridged && r.bridges === 1, 'rover lays bridge');
+run(g, 1, { pick_p: true }); assert(c.bridged && r.bridges === bridgeStock - 1, 'rover lays bridge');
 assert(g.stats.roverBridgesLaid === 1, 'bridge recovery counted once');
 run(g, 200, { right: true }); assert(wdx(r.x, c.x) > 0, 'rover crossed'); console.log('rover bridge ok');
 
@@ -116,6 +156,126 @@ console.log('enemy damage state ok');
 
 g = G(); g.level = 6; const u = new Alien('ufo', wrap(g.p.x + 60), 60, 1, 45); g.aliens.push(u); g.cam = g.p.x;
 run(g, 600); assert(!g.terr.craters.some(c2 => Math.abs(wdx(c2.x, u.x)) < 5) , 'ufo never cratered'); console.log('ufo ok');
+
+g = G();
+const herdHeavy = new Alien('heavy', wrap(g.p.x - 45), 70, 1, 0);
+const herdDiver = new Alien('diver', g.p.x, 55, 1, 0);
+g.aliens.push(herdHeavy, herdDiver);
+const herdAim = g.diverAim(herdDiver);
+assert(herdAim.herded && wdx(herdAim.x, g.p.x) > 0, 'diver threatens the clear side and leaves the heavy-side escape');
+g.level = 4; g.startMission(); g.base.x = wrap(g.p.x + 700);
+const guard = new Alien('chaser', g.p.x, 60, 1, 30);
+const guardAim = g.chaserTarget(guard);
+assert(guardAim.guarding && Math.abs(wdx(guardAim.x, g.base.x)) <= 82, 'chaser holds a readable missile-site screen');
+
+const loose = new L.Item('supply', guard.x, 60); loose.state = 'ground'; g.items.push(loose);
+const thief = new Alien('ufo', loose.x, loose.y, 1, 40); g.aliens.push(thief);
+assert(g.stealCargo(thief, loose) && loose.state === 'stolen' && thief.cargo === loose, 'ufo lifts unattended cargo');
+g.killAlien(thief);
+assert(loose.state === 'fall' && !loose.heldBy && !thief.cargo, 'shooting the ufo releases its cargo');
+console.log('enemy combinations ok');
+
+g = G(); g.p.fuel = 20;
+const fuel = g.spawnSalvage('fuelcell', g.p.x, g.p.y);
+assert(g.collectSalvage(fuel) && g.p.fuel === 50, 'fuel salvage restores a bounded amount');
+const cells = g.spawnSalvage('ammo', g.p.x, g.p.y);
+assert(g.collectSalvage(cells) && g.p.rapidT === L.RAPID_FIRE_TIME, 'laser cells enable timed rapid fire');
+const tech = g.spawnSalvage('unstable', g.p.x, g.p.y);
+g.p.carry = tech; tech.state = 'held';
+const salvageScore = g.score;
+assert(g.secureUnstable(tech) && g.score === salvageScore + 1000, 'unstable tech pays only when secured');
+const doomed = g.spawnSalvage('unstable', wrap(g.p.x + 200), 60); doomed.unstableT = 0.001; doomed.state = 'ground';
+g.updateItems(0.01);
+assert(!g.items.includes(doomed) && g.booms.some(b => b[3] === 'big'), 'ignored unstable tech detonates');
+g.rng.random = () => 0; g.rng.choice = () => 'fuelcell';
+const donor = new Alien('drifter', wrap(g.p.x + 30), 70, 1, 0); g.aliens.push(donor); g.killAlien(donor);
+assert(g.items.some(it => it.kind === 'fuelcell') && g.stats.salvageDrops >= 4, 'enemy kills use the tested salvage drop gate');
+console.log('salvage ok');
+
+assert(LEVEL_EVENTS.length === 4 && eventForLevel(1).id === 'solar'
+  && eventForLevel(2).id === 'telefail' && eventForLevel(3).id === 'meteor'
+  && eventForLevel(4).id === 'lowgrav' && eventForLevel(5).id === 'solar',
+  'four level events rotate without randomising the briefing');
+assert(SECONDARY_OBJECTIVES.length === 3 && secondaryForLevel(1).id === 'hunter'
+  && secondaryForLevel(2).id === 'salvage' && secondaryForLevel(3).id === 'quick',
+  'three optional objectives rotate by level');
+
+g = G(); g.levelEvent.next = 0; g.updateLevelEvent(0.01);
+assert(g.levelEventActive('solar') && g.stats.eventsStarted === 1, 'scheduled solar event starts once');
+g = G(); const beforeTeleport = g.p.x; g.startLevelEvent('telefail');
+assert(!g.teleport(0) && g.p.x === beforeTeleport, 'teleporter outage blocks travel cleanly');
+g.updateLevelEvent(L.LEVEL_EVENTS.find(e => e.id === 'telefail').duration + 0.01);
+assert(!g.levelEventActive('telefail') && g.teleport(0), 'teleporters recover when the event clears');
+
+const normalGravity = G(), lowGravity = G();
+normalGravity.p.onGround = false; normalGravity.p.vy = 0; normalGravity.p.y = 80;
+lowGravity.p.onGround = false; lowGravity.p.vy = 0; lowGravity.p.y = 80; lowGravity.startLevelEvent('lowgrav');
+normalGravity.updatePlayer(0.25, newInput()); lowGravity.updatePlayer(0.25, newInput());
+assert(lowGravity.p.vy < normalGravity.p.vy, 'low-gravity surge changes player physics rather than merely the caption');
+
+g = G(); let meteorX = wrap(g.cam + 260);
+while (Math.abs(wdx(meteorX, L.HOME_X)) < 60 || Math.abs(wdx(meteorX, g.rover.x)) < 40
+    || Math.abs(wdx(meteorX, g.base.x)) < 55 || g.terr.craterAt(meteorX, 14)) meteorX = wrap(meteorX + 31);
+const craterCount = g.terr.craters.length, warning = g.scheduleMeteor(meteorX); warning.t = 0;
+g.updateMeteors(0.01);
+assert(g.stats.meteorImpacts === 1 && g.terr.craters.length === craterCount + 1,
+  'meteor warning resolves into one real crater');
+console.log('level events ok');
+
+g = G(); const hunterStart = g.score;
+g.progressSecondary('hunter'); g.progressSecondary('hunter'); g.progressSecondary('hunter'); g.progressSecondary('hunter');
+assert(g.secondary.completed && g.score === hunterStart + 500 && g.stats.secondaryCompleted === 1,
+  'clear-the-sky objective awards one level-scaled bonus');
+g = G(); g.level = 2; g.startLevelProgression();
+const fieldFuel = g.spawnSalvage('fuelcell', g.p.x, g.p.y); g.collectSalvage(fieldFuel);
+assert(g.secondary.completed && g.secondary.id === 'salvage', 'field recovery follows actual salvage collection');
+g = G(); g.level = 3; g.startMission(); g.startLevelProgression(); g.timer = 35;
+g.completeMission('TEST COMPLETE', 0);
+assert(g.secondary.completed && g.score === 1500, 'beat-the-clock objective resolves with the primary mission');
+g = G(); g.level = 3; g.startMission(); g.startLevelProgression(); g.timer = 20;
+g.completeMission('TEST COMPLETE', 0);
+assert(g.secondary.failed && !g.secondary.completed, 'missed optional objective does not block mission completion');
+console.log('secondary objectives ok');
+
+assert(COMMAND_FIRST_LEVEL === 4 && commandEncounterForLevel(4, 'bomb')
+  && !commandEncounterForLevel(3, 'bomb') && !commandEncounterForLevel(5, 'supply'),
+  'command encounter starts with the later bomb runs only');
+g = G(); g.level = 4; g.placeBase(); g.startMission();
+let command = g.commandVehicle;
+assert(command && command.hp === COMMAND_HP && g.mission.major
+  && g.mission.briefing.includes('COMMAND VEHICLE'), 'level four creates the mobile command encounter');
+const shieldHp = command.hp;
+assert(!g.hitCommandVehicle(command) && command.hp === shieldHp, 'shielded vehicle rejects damage');
+g.p.invuln = 10; g.p.x = wrap(command.x + 20); g.p.y = g.terr.surface(g.p.x);
+command.stateT = 0; g.updateCommandVehicle(0.01);
+assert(command.state === 'charge' && command.targetX !== null && g.stats.commandAttacks === 0,
+  'command strike visibly locks a target before firing');
+g.updateCommandVehicle(COMMAND_CHARGE * 0.5);
+assert(command.state === 'charge', 'command strike preserves its reaction window');
+g.updateCommandVehicle(COMMAND_CHARGE);
+assert(command.state === 'exposed' && g.stats.commandAttacks === 1, 'finished strike opens a punish window');
+const commandScore = g.score;
+assert(g.hitCommandVehicle(command) && command.hp === COMMAND_HP - 1 && command.state === 'stagger',
+  'exposed core accepts one hit and enters recovery');
+for (let i = 0; i < COMMAND_HP - 1; i++) { command.state = 'exposed'; g.hitCommandVehicle(command); }
+assert(!g.commandVehicle && g.stats.commandHits === COMMAND_HP && g.stats.commandDestroyed === 1
+  && g.score === commandScore + 2500 * g.level, 'four readable openings destroy and score the command vehicle');
+
+g = G(); g.level = 4; g.placeBase(); g.startMission();
+let encounterBomb = g.items.find(it => it.kind === 'bomb');
+encounterBomb.x = g.base.x; encounterBomb.y = g.terr.base(g.base.x); encounterBomb.state = 'fall';
+g.updateItems(0);
+assert(g.items.includes(encounterBomb) && g.base.alive && !g.mission.completed
+  && Math.abs(wdx(encounterBomb.x, g.base.x)) >= 18, 'shielded site rejects the bomb without deleting it');
+g.commandVehicle = null; encounterBomb.x = g.base.x; encounterBomb.y = g.terr.base(g.base.x); encounterBomb.state = 'fall';
+g.updateItems(0);
+assert(!g.items.includes(encounterBomb) && g.mission.completed, 'bomb works normally once the command vehicle is gone');
+g = G(); g.level = 4; g.placeBase(); g.startMission(); command = g.commandVehicle;
+g.p.inRover = false; g.p.invuln = 0; g.p.dead = false; g.p.x = command.x; g.p.y = g.terr.surface(command.x);
+command.state = 'charge'; command.targetX = g.p.x; command.stateT = 0;
+g.updateCommandVehicle(0.01);
+assert(g.p.dead, 'ignoring the marked ground strike remains properly dangerous');
+console.log('command vehicle encounter ok');
 
 // sound is code now - make sure every recipe and the music render to something sane
 const { SFX_RECIPES, renderSfx } = require('../web/sfx.js');
