@@ -1,5 +1,36 @@
 # Change log
 
+## v4.8.0 — 16 November 2026
+
+This release turns the four tested 4.8 development milestones into one verified
+browser and source release. The structure is broader, but the game remains a fast,
+hostile arcade run rather than a lunar administration simulator.
+
+### Added
+
+- Three rotating mission types and four mutually exclusive rover loadouts.
+- Classic mode with fewer lives, tighter deadlines, denser waves, tougher missiles
+  and no automatic replacement bridge kits.
+- Coordinated diver, heavy, chaser and UFO behaviours, plus three salvage types.
+- Four readable level events and three optional score objectives.
+- A four-core mobile command vehicle with marked strikes, exposed counterattack
+  windows, a faster damaged phase and recoverable bomb rejection.
+- Deterministic browser and source packaging tools with per-archive manifests.
+
+### Changed
+
+- Preserved the later page metadata from `main` and corrected its malformed head
+  element before rebuilding the single-file game.
+- The displayed version and package identity now read `4.8.0`.
+
+### Verification
+
+- Full mechanics, input, art and generated-audio suites passed.
+- JavaScript and Python syntax checks passed.
+- The single-file build, browser interaction, long soak, extracted manifests and
+  extracted-source rebuild were checked for this release.
+- Physical-controller testing remains unverified.
+
 ## v4.8.0-dev.4 — 15 November 2026
 
 Later bomb runs now include a mobile alien command vehicle. It protects the

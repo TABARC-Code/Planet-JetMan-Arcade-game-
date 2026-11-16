@@ -1,4 +1,20 @@
-# Programmer notes — browser 4.8.0 development
+# Programmer notes — browser 4.8.0
+
+The release pass pulled the four milestones into one build and then made them earn
+the number. I preserved the later page metadata from `main`, repaired its doubled
+angle bracket and rebuilt from source. A search description is useful. A malformed
+head element is more avant-garde than the browser really needs.
+
+The packages now come from explicit lists with fixed archive timestamps and their
+own manifests. Both can be extracted and checked without trusting the ZIP merely
+because it looks pleasantly final. Physical controller testing is still stated as
+unverified; a deterministic pad model is evidence, not a USB socket.
+
+Future ideas: let UFOs occasionally contest salvage around the command vehicle,
+add a brief rover recoil frame, and explore a fourth mission which uses the level
+events rather than piling another icon onto the HUD.
+
+## v4.8.0-dev.4 notes
 
 For dev.4 I made the command vehicle an encounter rather than a large numerical
 complaint. It marks the ground, fires, drops its shield and offers one clean punish

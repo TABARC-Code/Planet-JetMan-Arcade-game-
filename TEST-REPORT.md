@@ -1,8 +1,32 @@
-# Test report — v4.8.0-dev.4
+# Test report — v4.8.0
 
-Tested on 15 November 2026 from the development branch.
+Final release tested on 16 November 2026 from release/4.8.0.
 
-## Development milestone
+## Final release
+
+- JavaScript syntax checks passed for all ten browser and regression files. Python
+  syntax checks passed for the builder and both deterministic packaging tools.
+- The complete mechanics suite passed: mission rotation, all four loadouts,
+  Classic mode, coordinated enemies, salvage, level events, optional objectives
+  and the command-vehicle encounter.
+- Controller lifecycle, art-contract and generated-audio suites passed.
+- The final 224 KB single-file browser rebuilt with SHA-256
+  1F7C984F5E84EA22AC7A657CF83AE2658DDF23305B927115DE6BECB40A282E9E.
+- Isolated Chromium interaction passed game start, ambience off/on, pause and
+  explicit recovery, and controller-dialog open and safe close.
+- The 1280×800 level-four frame showed the command vehicle, strike warning, HUD,
+  scanner, rover, Jetman, enemy damage and explosion states.
+- The same browser completed a 12,000-frame soak with no console or page errors:
+  SELFTEST OK frames=12000 games=1 maxLevel=1 ms=15815 audio=suspended buffers=28 ambience=6 music=30.0s.
+- The browser archive's seven-entry manifest and source archive's 41-entry
+  manifest matched every extracted payload file.
+- All four suites passed again inside the extracted source archive. Its rebuild
+  matched its own top-level game and the browser archive byte-for-byte.
+- The desktop-interaction bridge was unavailable. Browser checks used an isolated
+  Chromium process with real keyboard events, rendered pixels and console capture;
+  this was not a hand-operated GUI playthrough.
+
+## v4.8.0-dev.4 milestone record
 
 - Command-vehicle gating, shielding, target marking, reaction time, exposed-core
   punishment, faster damaged phase, score award and destruction passed.
@@ -22,14 +46,15 @@ Tested on 15 November 2026 from the development branch.
   `SELFTEST OK frames=12000 games=1 maxLevel=1 ms=15075 audio=suspended buffers=28 ambience=6 music=30.0s`.
 - Project-facing wording contains no prohibited development-tool references.
 
-The development browser's interactive console could not be inspected during this
-run, so no console-clean claim is made for dev.4. Syntax, regression and self-test
-results remain recorded separately rather than being dressed up as the same thing.
+The development browser's interactive console could not be inspected during the
+dev.4 run. The final release's isolated Chromium interaction and console check are
+recorded above rather than being retroactively assigned to that earlier milestone.
 
 A physical-controller playthrough remains unverified. Hardware remains hardware,
 obstinately.
 
-The v4.7.0 regression record follows and remains applicable.
+The v4.7.0 regression record follows as historical evidence for the inherited
+controller, art and audio systems.
 
 ## Passed
 

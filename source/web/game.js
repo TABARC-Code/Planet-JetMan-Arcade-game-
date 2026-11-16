@@ -14,7 +14,7 @@
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.8.0-dev.4';
+const VERSION = '4.8.0';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;

@@ -4,7 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Lunar Jetman - The Rebuild</title>
+<title>Planet Jetman | ZX Spectrum-Inspired Web Game | TABARC-Studio</title>
+<meta name="description" content="Play Planet Jetman by TABARC-Studio, a browser game inspired by a ZX Spectrum classic, with retro action and keyboard, touch and controller support.">
+<meta name="author" content="TABARC-Studio">
+<meta name="application-name" content="Planet Jetman">
+<meta name="apple-mobile-web-app-title" content="Planet Jetman">
+<meta name="theme-color" content="#000000">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_GB">
+<meta property="og:site_name" content="TABARC-Studio">
+<meta property="og:title" content="Planet Jetman | TABARC-Studio">
+<meta property="og:description" content="An updated browser game inspired by a ZX Spectrum classic, with keyboard, touch and controller support.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Planet Jetman | TABARC-Studio">
+<meta name="twitter:description" content="An updated browser game inspired by a ZX Spectrum classic, with keyboard, touch and controller support.">
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none;
     -webkit-user-select: none; user-select: none; }
@@ -120,7 +133,7 @@ const ASSET_DATA = {
 //   - proper wave tables per level instead of the weighted bag in kinds().
 'use strict';
 
-const VERSION = '4.8.0-dev.4';
+const VERSION = '4.8.0';
 const W = 320, H = 200, HUD = 20, HI_W = 1280, HI_H = 800;
 const WORLD = 3072, GROUND = 170, HOME_X = 160, CEILING = HUD + 14;
 const TAU = Math.PI * 2;

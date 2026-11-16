@@ -1,8 +1,9 @@
-# Lunar Jetman — 4.8.0 development branch
+# Lunar Jetman — browser release 4.8.0
 
-This branch contains the tested `4.8.0-dev.4` command-vehicle encounter,
-building on the mission, loadout, enemy-combination, salvage and level-event work.
-It is playable, but it is not the final 4.8.0 release package.
+Version 4.8.0 adds rotating missions, rover loadouts, coordinated enemies,
+risk-and-reward salvage, level events, optional objectives and the mobile command
+vehicle encounter. Classic mode keeps the old-school pressure without removing the
+warnings which make a hard game readable.
 
 Open `index.html` in a modern desktop browser. It is the complete game: artwork,
 generated sound and music are embedded, so no installation or network connection
@@ -11,9 +12,12 @@ is required. Browsers wait for a key press or click before allowing sound.
 ## What is in this archive
 
 - `index.html` — the playable, self-contained browser build.
+- `RELEASE-README.md` — the short guide used inside the browser-only ZIP.
 - `source/web/` — the browser rules, input, renderer, generated audio and packed art.
 - `source/tests/` — deterministic Node regression tests.
 - `source/tools/build_web.py` — rebuilds the single HTML file from `source/web/`.
+- `source/tools/package_browser.py` and `package_source.py` — create deterministic
+  browser and source archives from explicit file lists.
 - Release notes, programmer notes, test report, credits, provenance and checksums.
 
 There is no Python or Windows edition in this browser package, and no source-asset
@@ -83,4 +87,5 @@ node source/tests/audiotest.js
 ```
 
 The build script expects the package layout and writes `source/dist_web/index.html`.
-The top-level `index.html` is the already tested release build.
+The top-level `index.html` is the tested release build. Packaging scripts accept an
+`--output-root` directory and refuse development version markers.
